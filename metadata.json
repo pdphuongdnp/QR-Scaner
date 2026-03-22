@@ -1,0 +1,7 @@
+{
+  "name": "QR Scanner App",
+  "description": "Quét mã QR và lưu thông tin vào file CSV",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
