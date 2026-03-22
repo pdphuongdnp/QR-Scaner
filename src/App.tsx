@@ -381,8 +381,12 @@ export default function App() {
     a.download = fileName;
     document.body.appendChild(a);
     a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    
+    // Small delay for mobile browsers to process
+    setTimeout(() => {
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }, 200);
 
     // Auto redirect to welcome screen to start a new order
     setCurrentScreen('welcome');
