@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save } from 'lucide-react';
+import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home } from 'lucide-react';
 import { Scanner } from './components/Scanner';
 
 interface Record {
@@ -13,6 +13,7 @@ interface Record {
   productName: string;
   quantity: string;
   note?: string;
+  transferToLocation?: string; // Vị trí chuyển đến (chỉ cho Nhập hàng)
   createdAt: number;
   
   maBravo?: string;
@@ -28,7 +29,7 @@ interface Record {
   taiTrongXe?: string;
 }
 
-type ScanField = 'orderNumber' | 'pickerName' | 'location' | 'productName' | 'productQR' | 'welcomeOrderQR' | null;
+type ScanField = 'orderNumber' | 'pickerName' | 'location' | 'productName' | 'productQR' | 'welcomeOrderQR' | 'transferToLocation' | null;
 
 type ModalState = {
   isOpen: boolean;
@@ -67,6 +68,7 @@ export default function App() {
   const [productName, setProductName] = useState('');
   const [quantity, setQuantity] = useState('');
   const [note, setNote] = useState('');
+  const [transferToLocation, setTransferToLocation] = useState('');
   
   const [maBravo, setMaBravo] = useState('');
   const [khachHang, setKhachHang] = useState('');
@@ -117,6 +119,7 @@ export default function App() {
     if (scanningField === 'orderNumber') setOrderNumberInput(text);
     if (scanningField === 'pickerName') setPickerName(text);
     if (scanningField === 'location') setLocation(text);
+    if (scanningField === 'transferToLocation') setTransferToLocation(text);
     if (scanningField === 'welcomeOrderQR') {
       if (text.includes(';')) {
         const parts = text.split(';');
@@ -198,10 +201,11 @@ export default function App() {
       // Update existing record
       setRecords(records.map(r => 
         r.id === editingId 
-          ? { ...r, location, productLocation, productName, quantity, note, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
+          ? { ...r, location, productLocation, productName, quantity, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
           : r
       ));
       setEditingId(null);
+      showToast('Đã cập nhật bản ghi!');
     } else {
       // Add new record
       const newRecord: Record = {
@@ -214,11 +218,28 @@ export default function App() {
         productName,
         quantity,
         note,
+        transferToLocation,
         createdAt: Date.now(),
         maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe
       };
       setRecords([...records, newRecord]);
       setReviewIndex(99999); // Jump to the newly added record (clamped by useEffect)
+      showToast('Đã thêm bản ghi mới!');
+      
+      // Ask if user wants to scan another item
+      const message = currentScreen === 'nhap_hang' 
+        ? 'Bạn có muốn nhập mã vị trí nhập hàng khác không?' 
+        : 'Bạn có muốn soạn mã hàng khác không?';
+      
+      setTimeout(() => {
+        showConfirm(message, () => {
+          if (currentScreen === 'nhap_hang') {
+            setScanningField('location');
+          } else {
+            setScanningField('productQR');
+          }
+        });
+      }, 500);
     }
     
     // Reset form (giữ lại số đơn hàng và người soạn)
@@ -227,6 +248,7 @@ export default function App() {
     setProductName('');
     setQuantity('');
     setNote('');
+    setTransferToLocation('');
     setMaBravo('');
     setKhachHang('');
     setDvt('');
@@ -238,7 +260,6 @@ export default function App() {
     setNhanVienQuanHang('');
     setTrongLuong('');
     setTaiTrongXe('');
-    showToast(editingId ? 'Đã cập nhật bản ghi!' : 'Đã thêm bản ghi mới!');
   };
 
   const handleEdit = (record: Record) => {
@@ -248,6 +269,7 @@ export default function App() {
     setProductName(record.productName);
     setQuantity(record.quantity);
     setNote(record.note || '');
+    setTransferToLocation(record.transferToLocation || '');
     setMaBravo(record.maBravo || '');
     setKhachHang(record.khachHang || '');
     setDvt(record.dvt || '');
@@ -269,6 +291,7 @@ export default function App() {
     setProductName('');
     setQuantity('');
     setNote('');
+    setTransferToLocation('');
     setMaBravo('');
     setKhachHang('');
     setDvt('');
@@ -344,7 +367,7 @@ export default function App() {
       'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'Đơn hàng', 'ĐVT', 
       'SL Thực Xuất(cái)', 'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 
       'Thông tin mã hàng', 'Nhân viên quản hàng', 'Trọng lượng(kg)', 'Tải trọng xe(kg)',
-      'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Loại', 'Ghi chú'
+      'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Loại', 'Ghi chú'
     ].map(escapeCSV).join(',');
     
     const rows = currentOrderRecords.map(r => 
@@ -363,6 +386,7 @@ export default function App() {
         r.nhanVienQuanHang || '', 
         r.trongLuong || '', 
         r.taiTrongXe || '',
+        r.transferToLocation || '',
         r.pickerName || '', 
         r.location || '', 
         r.quantity || '',
@@ -452,9 +476,9 @@ export default function App() {
 
   if (currentScreen === 'welcome') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center p-4">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100 w-full max-w-md space-y-6 text-center">
-          <div className="w-16 h-16 bg-indigo-100 text-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
+      <div className="min-h-screen flex flex-col items-center justify-center p-4">
+        <div className="bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-white/20 w-full max-w-md space-y-6 text-center">
+          <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <ShoppingCart size={32} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">SOẠN / NHẬP HÀNG DNP</h1>
@@ -481,14 +505,14 @@ export default function App() {
             <button 
               onClick={() => handleStartOrder(orderNumberInput)}
               disabled={!orderNumberInput || !pickerName}
-              className="w-full py-3.5 bg-indigo-600 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-700 transition-colors shadow-sm"
+              className="w-full py-3.5 bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
             >
               Bắt đầu soạn hàng
             </button>
             <button 
               onClick={handleStartNhapHang}
               disabled={!pickerName}
-              className="w-full py-3.5 bg-emerald-600 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-emerald-700 transition-colors shadow-sm"
+              className="w-full py-3.5 bg-amber-500 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-amber-600 transition-colors shadow-sm"
             >
               Bắt đầu nhập hàng
             </button>
@@ -505,10 +529,10 @@ export default function App() {
                   <button
                     key={order}
                     onClick={() => handleResumeOrder(order)}
-                    className="w-full p-3 bg-gray-50 hover:bg-indigo-50 border border-gray-100 rounded-xl text-left flex items-center justify-between group transition-colors"
+                    className="w-full p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-xl text-left flex items-center justify-between group transition-colors"
                   >
-                    <span className="font-medium text-gray-700 group-hover:text-indigo-700 truncate pr-2">{order}</span>
-                    <ChevronRight size={18} className="text-gray-400 group-hover:text-indigo-500 flex-shrink-0" />
+                    <span className="font-medium text-gray-700 group-hover:text-blue-700 truncate pr-2">{order}</span>
+                    <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-500 flex-shrink-0" />
                   </button>
                 ))}
               </div>
@@ -531,9 +555,9 @@ export default function App() {
   const currentRecord = currentOrderRecords[safeReviewIndex];
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-24">
+    <div className="min-h-screen pb-24">
       {/* Header */}
-      <header className={`text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center ${currentScreen === 'nhap_hang' ? 'bg-emerald-600' : 'bg-indigo-600'}`}>
+      <header className={`text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center ${currentScreen === 'nhap_hang' ? 'bg-amber-500/90' : 'bg-blue-600/90'} backdrop-blur-md`}>
         <h1 className="text-xl font-bold flex items-center gap-2">
           <ShoppingCart /> {currentScreen === 'nhap_hang' ? 'NHẬP HÀNG DNP' : 'SOẠN HÀNG DNP'}
         </h1>
@@ -542,15 +566,16 @@ export default function App() {
             setCurrentScreen('welcome');
             setOrderNumberInput('');
           }} 
-          className="text-sm bg-white/20 px-3 py-1.5 rounded-lg hover:bg-white/30 transition-colors font-medium"
+          className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+          title="Về trang chủ"
         >
-          {currentScreen === 'nhap_hang' ? 'Trở về' : 'Đổi đơn'}
+          <Home size={20} />
         </button>
       </header>
 
       <main className="p-4 max-w-md mx-auto space-y-6">
         {/* Input Form */}
-        <div className={`bg-white p-5 rounded-2xl shadow-sm border ${editingId ? 'border-blue-300 ring-2 ring-blue-50' : 'border-gray-100'} space-y-4 transition-all`}>
+        <div className={`bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border ${editingId ? 'border-blue-300 ring-2 ring-blue-50' : 'border-white/20'} space-y-4 transition-all`}>
           {editingId && (
             <div className="flex justify-between items-center mb-2">
               <h2 className="font-semibold text-blue-700">
@@ -580,7 +605,7 @@ export default function App() {
                     type="text" 
                     value={productName}
                     onChange={(e) => setProductName(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
                     placeholder="Nhập tên hàng..."
                   />
                 </div>
@@ -592,25 +617,33 @@ export default function App() {
                   onScanClick={() => setScanningField('location')} 
                   placeholder="Nhập hoặc quét mã..."
                 />
+
+                <ScanInput 
+                  label="4. Vị trí chuyển đến (Chuyển kho)" 
+                  value={transferToLocation} 
+                  onChange={setTransferToLocation} 
+                  onScanClick={() => setScanningField('transferToLocation')} 
+                  placeholder="Nhập hoặc quét mã chuyển đến..."
+                />
                 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">4. Số lượng</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">5. Số lượng</label>
                   <input 
                     type="number" 
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none transition-all"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
                     placeholder="Nhập số lượng..."
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">5. Ghi chú</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">6. Ghi chú</label>
                   <textarea 
                     value={note}
                     onChange={(e) => setNote(e.target.value)}
                     rows={3}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none resize-none transition-all"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all"
                     placeholder="Nhập ghi chú..."
                   />
                 </div>
@@ -620,9 +653,9 @@ export default function App() {
                 <div className="pb-2">
                   <button
                     onClick={() => setScanningField('productQR')}
-                    className="w-full py-3 bg-indigo-100 text-indigo-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-indigo-200 transition-colors border border-indigo-200"
+                    className="w-full py-3 bg-blue-100 text-blue-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-200 transition-colors border border-blue-200"
                   >
-                    <QrCode size={20} /> Quét QR Sản phẩm (Mã Bravo - Tên SP - ...)
+                    <QrCode size={20} /> Quét QR sản phẩm cần soạn
                   </button>
                 </div>
 
@@ -677,7 +710,7 @@ export default function App() {
                     type="number" 
                     value={quantity}
                     onChange={(e) => setQuantity(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all"
+                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                     placeholder="Nhập số lượng..."
                   />
                 </div>
@@ -694,8 +727,8 @@ export default function App() {
                 : editingId 
                   ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm' 
                   : currentScreen === 'nhap_hang'
-                    ? 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
-                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm'
+                    ? 'bg-amber-500 text-white hover:bg-amber-600 shadow-sm'
+                    : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
             }`}
           >
             {editingId ? (
@@ -748,7 +781,7 @@ export default function App() {
         </div>
 
         {/* Records Review Carousel */}
-        <div className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100">
+        <div className="bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border border-white/20">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2">
               <FileText size={18} className="text-gray-500" /> 
@@ -801,7 +834,7 @@ export default function App() {
               <div className={`p-4 border rounded-xl space-y-2 text-sm transition-colors ${
                 editingId === currentRecord?.id 
                   ? 'border-blue-200 bg-blue-50/50' 
-                  : 'border-indigo-100 bg-indigo-50/30'
+                  : 'border-blue-100 bg-blue-50/30'
               }`}>
                 <div className="flex justify-between border-b border-black/5 pb-2">
                   <span className="text-gray-500">{currentScreen === 'nhap_hang' ? 'Người nhập:' : 'Người soạn:'}</span>
@@ -823,6 +856,12 @@ export default function App() {
                   <span className="text-gray-500">Vị trí thực tế:</span>
                   <span className="font-medium text-gray-900">{currentRecord?.location || '-'}</span>
                 </div>
+                {currentRecord?.transferToLocation && (
+                  <div className="flex justify-between border-b border-black/5 pb-2">
+                    <span className="text-gray-500">Vị trí chuyển đến:</span>
+                    <span className="font-medium text-blue-600">{currentRecord.transferToLocation}</span>
+                  </div>
+                )}
                 {currentScreen !== 'nhap_hang' && (
                   <div className="flex justify-between border-b border-black/5 pb-2">
                     <span className="text-gray-500">Mã Bravo:</span>
@@ -847,7 +886,7 @@ export default function App() {
                 )}
                 <div className={`flex justify-between pt-1 items-center ${currentScreen === 'nhap_hang' && currentRecord?.note ? 'border-b border-black/5 pb-2' : ''}`}>
                   <span className="text-gray-500">Số lượng:</span>
-                  <span className={`font-bold text-base px-2 py-0.5 rounded-md ${currentScreen === 'nhap_hang' ? 'text-emerald-600 bg-emerald-100' : 'text-indigo-600 bg-indigo-100'}`}>{currentRecord?.quantity || '-'}</span>
+                  <span className={`font-bold text-base px-2 py-0.5 rounded-md ${currentScreen === 'nhap_hang' ? 'text-amber-700 bg-amber-100' : 'text-blue-600 bg-blue-100'}`}>{currentRecord?.quantity || '-'}</span>
                 </div>
                 {currentScreen === 'nhap_hang' && currentRecord?.note && (
                   <div className="flex justify-between pt-1 items-center">
@@ -904,13 +943,13 @@ export default function App() {
       </main>
 
       {/* Fixed Bottom Action */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white border-t border-gray-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <div className="max-w-md mx-auto">
           <button 
             onClick={handleDownload}
             disabled={currentOrderRecords.length === 0}
             className={`w-full py-3.5 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm ${
-              currentScreen === 'nhap_hang' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-indigo-600 hover:bg-indigo-700'
+              currentScreen === 'nhap_hang' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
             <Download size={20} /> Ghi dữ liệu (Tải File CSV)
@@ -942,8 +981,8 @@ function CustomModal({ modal, onClose }: { modal: ModalState, onClose: () => voi
   if (!modal.isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
-      <div className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+      <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-white/20">
         <h3 className="text-lg font-bold text-gray-900 mb-2">{modal.title}</h3>
         <p className="text-gray-600 mb-6">{modal.message}</p>
         <div className="flex justify-end gap-3">
@@ -960,7 +999,7 @@ function CustomModal({ modal, onClose }: { modal: ModalState, onClose: () => voi
               if (modal.onConfirm) modal.onConfirm();
               onClose();
             }}
-            className="px-4 py-2 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl font-medium transition-colors"
+            className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-medium transition-colors"
           >
             {modal.type === 'confirm' ? 'Đồng ý' : 'Đóng'}
           </button>
@@ -982,23 +1021,23 @@ function ScanInput({ label, value, onChange, onScanClick, placeholder, disabled 
     <div>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <div className="flex gap-2">
-        <input 
-          type="text" 
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          disabled={disabled}
-          className={`flex-1 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-all ${disabled ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
-          placeholder={placeholder}
-        />
         {!disabled && (
           <button 
             onClick={onScanClick}
-            className="p-3 bg-indigo-100 text-indigo-700 rounded-xl hover:bg-indigo-200 transition-colors flex items-center justify-center aspect-square"
+            className="p-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors flex items-center justify-center aspect-square"
             title="Quét mã QR"
           >
             <QrCode size={20} />
           </button>
         )}
+        <input 
+          type="text" 
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          disabled={disabled}
+          className={`flex-1 p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all ${disabled ? 'bg-gray-100 text-gray-500 cursor-not-allowed' : ''}`}
+          placeholder={placeholder}
+        />
       </div>
     </div>
   );
