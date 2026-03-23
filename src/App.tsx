@@ -1,7 +1,10 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home } from 'lucide-react';
+import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info } from 'lucide-react';
 import { Scanner } from './components/Scanner';
+import { GuideModal } from './components/GuideModal';
+import { downloadUserGuideDocx } from './utils/generateDocx';
+import Joyride, { STATUS, Step } from 'react-joyride';
 
 interface Record {
   id: string;
@@ -62,7 +65,9 @@ export default function App() {
 
   const [activeOrderNumber, setActiveOrderNumber] = useState('');
   const [orderNumberInput, setOrderNumberInput] = useState('');
-  const [pickerName, setPickerName] = useState('');
+  const [pickerName, setPickerName] = useState(() => {
+    return localStorage.getItem('qr_scanner_picker_name') || '';
+  });
   const [location, setLocation] = useState('');
   const [productLocation, setProductLocation] = useState('');
   const [productName, setProductName] = useState('');
@@ -88,6 +93,136 @@ export default function App() {
   const [reviewIndex, setReviewIndex] = useState(0);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [runTour, setRunTour] = useState(false);
+  const [isGuideOpen, setIsGuideOpen] = useState(false);
+
+  // Check if it's the first time visiting a screen to run the tour
+  useEffect(() => {
+    const hasSeenTour = localStorage.getItem(`has_seen_tour_${currentScreen}_v1`);
+    if (!hasSeenTour) {
+      setRunTour(true);
+    } else {
+      setRunTour(false);
+    }
+  }, [currentScreen]);
+
+  const handleTourFinish = (data: any) => {
+    const { status } = data;
+    if ([STATUS.FINISHED, STATUS.SKIPPED].includes(status)) {
+      setRunTour(false);
+      localStorage.setItem(`has_seen_tour_${currentScreen}_v1`, 'true');
+    }
+  };
+
+  const getTourSteps = (): Step[] => {
+    if (currentScreen === 'welcome') {
+      return [
+        {
+          target: '#picker-name-input',
+          content: 'Đầu tiên, hãy nhập tên của bạn vào đây để hệ thống biết ai là người thực hiện.',
+          disableBeacon: true,
+        },
+        {
+          target: '#order-number-input',
+          content: 'Nếu bạn đi Soạn hàng, hãy quét mã QR trên phiếu hoặc nhập số đơn hàng tại đây.',
+        },
+        {
+          target: '#btn-soan-hang',
+          content: 'Bấm vào đây để bắt đầu quy trình Soạn hàng (màu xanh).',
+        },
+        {
+          target: '#btn-nhap-hang',
+          content: 'Hoặc bấm vào đây nếu bạn muốn Nhập hàng mới vào kho (màu vàng).',
+        },
+        {
+          target: '#btn-help-docx',
+          content: 'Bạn cũng có thể tải file hướng dẫn chi tiết bằng Word tại đây để in ra nếu cần.',
+        },
+      ];
+    }
+    
+    if (currentScreen === 'soan_hang') {
+      return [
+        {
+          target: '#btn-scan-product',
+          content: 'Đây là nút quan trọng nhất! Bấm vào để quét mã QR trên sản phẩm. Thông tin sản phẩm sẽ tự động hiện ra.',
+          disableBeacon: true,
+        },
+        {
+          target: '#product-name-display',
+          content: 'Thông tin sản phẩm sau khi quét sẽ được hiển thị tại đây.',
+        },
+        {
+          target: '#location-input',
+          content: 'Nhập vị trí bạn lấy hàng vào đây. Định dạng chuẩn là X-000-00.',
+        },
+        {
+          target: '#quantity-input',
+          content: 'Nhập số lượng thực tế bạn đã soạn.',
+        },
+        {
+          target: '#btn-add-record',
+          content: 'Sau khi nhập đủ thông tin, bấm nút này để lưu món hàng vào danh sách tạm thời.',
+        },
+        {
+          target: '#review-section',
+          content: 'Bạn có thể xem lại, sửa hoặc xóa các món đã quét tại khu vực này.',
+        },
+        {
+          target: '#btn-save-csv',
+          content: 'Cuối cùng, khi đã xong toàn bộ đơn, hãy bấm nút này để tải file dữ liệu về máy.',
+        },
+        {
+          target: '#btn-home',
+          content: 'Bấm vào đây để quay lại màn hình chính khi hoàn tất.',
+        },
+      ];
+    }
+    
+    if (currentScreen === 'nhap_hang') {
+      return [
+        {
+          target: '#product-name-input',
+          content: 'Nhập tên hàng hóa bạn đang nhập vào kho.',
+          disableBeacon: true,
+        },
+        {
+          target: '#location-input',
+          content: 'Nhập vị trí hiện tại của hàng hóa.',
+        },
+        {
+          target: '#transfer-to-location-input',
+          content: 'Nếu bạn đang chuyển kho, hãy nhập vị trí mới tại đây.',
+        },
+        {
+          target: '#quantity-input',
+          content: 'Nhập số lượng hàng hóa.',
+        },
+        {
+          target: '#note-input',
+          content: 'Thêm ghi chú nếu cần thiết.',
+        },
+        {
+          target: '#btn-add-record',
+          content: 'Bấm nút này để lưu thông tin nhập hàng.',
+        },
+        {
+          target: '#review-section',
+          content: 'Xem lại danh sách hàng đã nhập tại đây.',
+        },
+        {
+          target: '#btn-save-csv',
+          content: 'Tải file dữ liệu nhập hàng khi hoàn tất.',
+        },
+        {
+          target: '#btn-home',
+          content: 'Quay lại màn hình chính.',
+        },
+      ];
+    }
+    
+    return [];
+  };
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -114,6 +249,11 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('qr_scanner_records', JSON.stringify(records));
   }, [records]);
+
+  // Save picker name to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_picker_name', pickerName);
+  }, [pickerName]);
 
   const handleScan = (text: string) => {
     if (scanningField === 'orderNumber') setOrderNumberInput(text);
@@ -477,15 +617,59 @@ export default function App() {
   if (currentScreen === 'welcome') {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-4">
+      <Joyride
+        steps={getTourSteps()}
+        run={runTour}
+        continuous
+        showProgress
+        showSkipButton
+        callback={handleTourFinish}
+        locale={{
+          back: 'Quay lại',
+          close: 'Đóng',
+          last: 'Hoàn tất',
+          next: 'Tiếp theo',
+          skip: 'Bỏ qua'
+        }}
+        styles={{
+          options: {
+            primaryColor: '#2563eb',
+            zIndex: 1000,
+          }
+        }}
+      />
         <div className="bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-white/20 w-full max-w-md space-y-6 text-center">
           <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <ShoppingCart size={32} />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">SOẠN / NHẬP HÀNG DNP</h1>
           <p className="text-gray-500 text-sm">Vui lòng nhập thông tin để bắt đầu</p>
+
+          <div className="flex flex-col gap-2">
+            <button 
+              onClick={() => setIsGuideOpen(true)}
+              className="flex items-center justify-center gap-2 mx-auto text-blue-600 hover:text-blue-700 text-sm font-medium bg-blue-50 px-4 py-2 rounded-full transition-colors"
+            >
+              <HelpCircle size={16} /> Xem hướng dẫn (Web)
+            </button>
+            <button 
+              id="btn-help-docx"
+              onClick={downloadUserGuideDocx}
+              className="flex items-center justify-center gap-2 mx-auto text-emerald-600 hover:text-emerald-700 text-sm font-medium bg-emerald-50 px-4 py-2 rounded-full transition-colors"
+            >
+              <Download size={16} /> Tải hướng dẫn (.docx)
+            </button>
+            <button 
+              onClick={() => setRunTour(true)}
+              className="flex items-center justify-center gap-2 mx-auto text-gray-600 hover:text-gray-700 text-sm font-medium bg-gray-50 px-4 py-2 rounded-full transition-colors"
+            >
+              <Info size={16} /> Xem lại hướng dẫn nhanh
+            </button>
+          </div>
           
           <div className="text-left space-y-4">
             <ScanInput 
+              id="picker-name-input"
               label="Người soạn / Người nhập" 
               value={pickerName} 
               onChange={setPickerName} 
@@ -493,6 +677,7 @@ export default function App() {
               placeholder="Nhập tên..."
             />
             <ScanInput 
+              id="order-number-input"
               label="Quét QR Đơn hàng (Dành cho Soạn hàng)" 
               value={orderNumberInput} 
               onChange={setOrderNumberInput} 
@@ -503,6 +688,7 @@ export default function App() {
 
           <div className="space-y-3">
             <button 
+              id="btn-soan-hang"
               onClick={() => handleStartOrder(orderNumberInput)}
               disabled={!orderNumberInput || !pickerName}
               className="w-full py-3.5 bg-blue-600 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-700 transition-colors shadow-sm"
@@ -510,6 +696,7 @@ export default function App() {
               Bắt đầu soạn hàng
             </button>
             <button 
+              id="btn-nhap-hang"
               onClick={handleStartNhapHang}
               disabled={!pickerName}
               className="w-full py-3.5 bg-amber-500 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-amber-600 transition-colors shadow-sm"
@@ -556,21 +743,66 @@ export default function App() {
 
   return (
     <div className="min-h-screen pb-24">
+      <Joyride
+        steps={getTourSteps()}
+        run={runTour}
+        continuous
+        showProgress
+        showSkipButton
+        callback={handleTourFinish}
+        locale={{
+          back: 'Quay lại',
+          close: 'Đóng',
+          last: 'Hoàn tất',
+          next: 'Tiếp theo',
+          skip: 'Bỏ qua'
+        }}
+        styles={{
+          options: {
+            primaryColor: '#2563eb',
+            zIndex: 1000,
+          }
+        }}
+      />
       {/* Header */}
       <header className={`text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center ${currentScreen === 'nhap_hang' ? 'bg-amber-500/90' : 'bg-blue-600/90'} backdrop-blur-md`}>
         <h1 className="text-xl font-bold flex items-center gap-2">
           <ShoppingCart /> {currentScreen === 'nhap_hang' ? 'NHẬP HÀNG DNP' : 'SOẠN HÀNG DNP'}
         </h1>
-        <button 
-          onClick={() => {
-            setCurrentScreen('welcome');
-            setOrderNumberInput('');
-          }} 
-          className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
-          title="Về trang chủ"
-        >
-          <Home size={20} />
-        </button>
+        <div className="flex gap-2">
+          <button 
+            onClick={() => setRunTour(true)}
+            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            title="Hướng dẫn nhanh"
+          >
+            <Info size={20} />
+          </button>
+          <button 
+            onClick={downloadUserGuideDocx}
+            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            title="Tải hướng dẫn (.docx)"
+          >
+            <Download size={20} />
+          </button>
+          <button 
+            onClick={() => setIsGuideOpen(true)}
+            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            title="Xem hướng dẫn"
+          >
+            <HelpCircle size={20} />
+          </button>
+          <button 
+            id="btn-home"
+            onClick={() => {
+              setCurrentScreen('welcome');
+              setOrderNumberInput('');
+            }} 
+            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            title="Về trang chủ"
+          >
+            <Home size={20} />
+          </button>
+        </div>
       </header>
 
       <main className="p-4 max-w-md mx-auto space-y-6">
@@ -599,7 +831,7 @@ export default function App() {
                   disabled={true}
                 />
                 
-                <div>
+                <div id="product-name-input">
                   <label className="block text-sm font-medium text-gray-700 mb-1">2. Tên hàng</label>
                   <input 
                     type="text" 
@@ -611,6 +843,7 @@ export default function App() {
                 </div>
 
                 <ScanInput 
+                  id="location-input"
                   label="3. Vị trí thực tế (VD: A-001-01)" 
                   value={location} 
                   onChange={setLocation} 
@@ -619,6 +852,7 @@ export default function App() {
                 />
 
                 <ScanInput 
+                  id="transfer-to-location-input"
                   label="4. Vị trí chuyển đến (Chuyển kho)" 
                   value={transferToLocation} 
                   onChange={setTransferToLocation} 
@@ -626,7 +860,7 @@ export default function App() {
                   placeholder="Nhập hoặc quét mã chuyển đến..."
                 />
                 
-                <div>
+                <div id="quantity-input">
                   <label className="block text-sm font-medium text-gray-700 mb-1">5. Số lượng</label>
                   <input 
                     type="number" 
@@ -637,7 +871,7 @@ export default function App() {
                   />
                 </div>
 
-                <div>
+                <div id="note-input">
                   <label className="block text-sm font-medium text-gray-700 mb-1">6. Ghi chú</label>
                   <textarea 
                     value={note}
@@ -652,6 +886,7 @@ export default function App() {
               <>
                 <div className="pb-2">
                   <button
+                    id="btn-scan-product"
                     onClick={() => setScanningField('productQR')}
                     className="w-full py-3 bg-blue-100 text-blue-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-200 transition-colors border border-blue-200"
                   >
@@ -688,6 +923,7 @@ export default function App() {
                 </div>
 
                 <ScanInput 
+                  id="product-name-display"
                   label="4. Tên sản phẩm" 
                   value={productName} 
                   onChange={() => {}} 
@@ -697,6 +933,7 @@ export default function App() {
                 />
 
                 <ScanInput 
+                  id="location-input"
                   label="5. Vị trí thực tế (VD: A-001-01)" 
                   value={location} 
                   onChange={setLocation} 
@@ -704,7 +941,7 @@ export default function App() {
                   placeholder="Nhập hoặc quét mã..."
                 />
                 
-                <div>
+                <div id="quantity-input">
                   <label className="block text-sm font-medium text-gray-700 mb-1">6. Số lượng thực tế</label>
                   <input 
                     type="number" 
@@ -719,6 +956,7 @@ export default function App() {
           </div>
 
           <button 
+            id="btn-add-record"
             onClick={handleAddOrUpdateRecord}
             disabled={!quantity || isNaN(Number(quantity)) || Number(quantity) <= 0 || !/^[A-Z]-\d{3}-\d{2}$/.test(location) || !productName.trim()}
             className={`w-full mt-4 py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
@@ -781,7 +1019,7 @@ export default function App() {
         </div>
 
         {/* Records Review Carousel */}
-        <div className="bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border border-white/20">
+        <div id="review-section" className="bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border border-white/20">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2">
               <FileText size={18} className="text-gray-500" /> 
@@ -946,6 +1184,7 @@ export default function App() {
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <div className="max-w-md mx-auto">
           <button 
+            id="btn-save-csv"
             onClick={handleDownload}
             disabled={currentOrderRecords.length === 0}
             className={`w-full py-3.5 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm ${
@@ -965,6 +1204,7 @@ export default function App() {
         />
       )}
       <CustomModal modal={modal} onClose={closeModal} />
+      <GuideModal isOpen={isGuideOpen} onClose={() => setIsGuideOpen(false)} />
 
       {/* Toast Notification */}
       {toastMessage && (
@@ -1009,16 +1249,17 @@ function CustomModal({ modal, onClose }: { modal: ModalState, onClose: () => voi
   );
 }
 
-function ScanInput({ label, value, onChange, onScanClick, placeholder, disabled }: { 
+function ScanInput({ label, value, onChange, onScanClick, placeholder, disabled, id }: { 
   label: string, 
   value: string, 
   onChange: (val: string) => void, 
   onScanClick: () => void,
   placeholder?: string,
-  disabled?: boolean
+  disabled?: boolean,
+  id?: string
 }) {
   return (
-    <div>
+    <div id={id}>
       <label className="block text-sm font-medium text-gray-700 mb-1">{label}</label>
       <div className="flex gap-2">
         {!disabled && (
