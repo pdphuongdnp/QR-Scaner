@@ -1,6 +1,6 @@
 {
-  "name": "QR Scanner App",
-  "description": "Quét mã QR và lưu thông tin vào file CSV",
+  "name": "QUẢN LÝ KHO DNP",
+  "description": "Hệ thống quản lý kho DNP - Soạn và Nhập hàng",
   "requestFramePermissions": [
     "camera"
   ]
