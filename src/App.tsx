@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format } from 'date-fns';
-import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info } from 'lucide-react';
+import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers } from 'lucide-react';
 import { Scanner } from './components/Scanner';
 import { GuideModal } from './components/GuideModal';
 import { downloadUserGuideDocx } from './utils/generateDocx';
@@ -38,12 +38,18 @@ type ModalState = {
   isOpen: boolean;
   title: string;
   message: string;
-  type: 'alert' | 'confirm';
+  type: 'alert' | 'confirm' | 'three-way';
   onConfirm?: () => void;
+  onSecondary?: () => void;
+  confirmText?: string;
+  secondaryText?: string;
+  cancelText?: string;
 };
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'welcome' | 'soan_hang' | 'nhap_hang'>('welcome');
+  const [currentScreen, setCurrentScreen] = useState<'welcome' | 'soan_hang' | 'nhap_hang'>(() => {
+    return (localStorage.getItem('qr_scanner_current_screen') as any) || 'welcome';
+  });
   
   const [modal, setModal] = useState<ModalState>({ isOpen: false, title: '', message: '', type: 'alert' });
 
@@ -55,6 +61,20 @@ export default function App() {
     setModal({ isOpen: true, title, message, type: 'confirm', onConfirm });
   };
 
+  const showThreeWay = (message: string, onConfirm: () => void, onSecondary: () => void, title = 'Xác nhận') => {
+    setModal({ 
+      isOpen: true, 
+      title, 
+      message, 
+      type: 'three-way', 
+      onConfirm, 
+      onSecondary,
+      confirmText: 'Lưu',
+      secondaryText: 'Không lưu',
+      cancelText: 'Hủy'
+    });
+  };
+
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
 
   // Load records from localStorage on initial render
@@ -63,7 +83,9 @@ export default function App() {
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [activeOrderNumber, setActiveOrderNumber] = useState('');
+  const [activeOrderNumber, setActiveOrderNumber] = useState(() => {
+    return localStorage.getItem('qr_scanner_active_order') || '';
+  });
   const [orderNumberInput, setOrderNumberInput] = useState('');
   const [pickerName, setPickerName] = useState(() => {
     return localStorage.getItem('qr_scanner_picker_name') || '';
@@ -254,6 +276,117 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem('qr_scanner_picker_name', pickerName);
   }, [pickerName]);
+
+  // Save current screen and active order to localStorage
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_current_screen', currentScreen);
+  }, [currentScreen]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_active_order', activeOrderNumber);
+  }, [activeOrderNumber]);
+
+  // Navigation Guard: Check for unsaved changes
+  const hasUnsavedChanges = () => {
+    return !!(location || productName || quantity || note || maBravo || khachHang);
+  };
+
+  // Prevent browser reload
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (hasUnsavedChanges()) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [location, productName, quantity, note, maBravo, khachHang]);
+
+  // Handle browser back button
+  useEffect(() => {
+    const handlePopState = (e: PopStateEvent) => {
+      // If scanner is open, close it first
+      if (scanningField) {
+        setScanningField(null);
+        // We stay on the current screen, so we need to push the state back to keep the "back" button working for the screen
+        window.history.pushState({ screen: currentScreen, scanning: false }, '');
+        return;
+      }
+
+      if (currentScreen !== 'welcome') {
+        // Prevent default back navigation
+        window.history.pushState({ screen: currentScreen }, '');
+        handleGoHome();
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, [currentScreen, scanningField, location, productName, quantity, note, maBravo, khachHang]);
+
+  // When scanner opens, push a state to handle back button
+  useEffect(() => {
+    if (scanningField) {
+      window.history.pushState({ screen: currentScreen, scanning: true }, '');
+    }
+  }, [scanningField]);
+
+  const handleGoHome = () => {
+    if (hasUnsavedChanges()) {
+      showThreeWay(
+        'Bạn đang có dữ liệu chưa lưu. Bạn có muốn lưu lại trước khi quay về trang chủ không?', 
+        () => {
+          // User wants to save
+          if (!location && !productName && !quantity) {
+            showAlert('Vui lòng nhập đầy đủ thông tin (Vị trí, Tên SP, hoặc Số lượng) để lưu.');
+          } else {
+            handleAddOrUpdateRecord();
+            setCurrentScreen('welcome');
+          }
+        }, 
+        () => {
+          // User doesn't want to save
+          setCurrentScreen('welcome');
+          // Clear unsaved fields
+          setLocation('');
+          setProductName('');
+          setQuantity('');
+          setNote('');
+          setMaBravo('');
+          setKhachHang('');
+        },
+        'Lưu dữ liệu?'
+      );
+    } else {
+      setCurrentScreen('welcome');
+    }
+  };
+
+  const handleExitApp = () => {
+    showConfirm('Bạn có chắc chắn muốn thoát ứng dụng không?', () => {
+      // Try to close window (only works if opened by script or in some PWA contexts)
+      window.close();
+      // Fallback for PWA/standalone: redirect to a blank page or show a "Goodbye" screen
+      showAlert('Ứng dụng đã sẵn sàng để đóng. Vui lòng vuốt ứng dụng đi để thoát hoàn toàn.');
+    }, 'Thoát ứng dụng');
+  };
+
+  const handleSwitchApp = () => {
+    showAlert('Trình duyệt không thể mở trực tiếp trình quản lý ứng dụng của hệ thống vì lý do bảo mật. Vui lòng sử dụng phím điều hướng của điện thoại để chuyển đổi ứng dụng.', 'Chuyển ứng dụng');
+  };
+
+  const toggleFullScreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(err => {
+        console.error(`Error attempting to enable full-screen mode: ${err.message}`);
+      });
+    } else {
+      if (document.exitFullscreen) {
+        document.exitFullscreen();
+      }
+    }
+  };
 
   const handleScan = (text: string) => {
     if (scanningField === 'orderNumber') setOrderNumberInput(text);
@@ -498,9 +631,18 @@ export default function App() {
       return stringified;
     };
 
-    // Format: [tên người soạn] [4 số cuối đơn hàng] [ddMMMyyyy hhmm].CSV
-    const last4Order = activeOrderNumber.slice(-4);
-    const fileName = `${pickerName} ${last4Order} ${format(new Date(), 'ddMMMyyyy HHmm')}.CSV`;
+    // Format:
+    // 1. Nhập: N_ddMMMyy_hhmmss_tên người nhập
+    // 2. Soạn: S_số đơn hàng_ddMMMyy_hhmmss_tên người soạn
+    const isNhap = currentOrderRecords.some(r => r.type === 'nhap_hang');
+    const timestamp = format(new Date(), 'ddMMMyy_HHmmss');
+    let fileName = '';
+    
+    if (isNhap) {
+      fileName = `N_${timestamp}_${pickerName}.csv`;
+    } else {
+      fileName = `S_${activeOrderNumber}_${timestamp}_${pickerName}.csv`;
+    }
     
     // Create content (comma separated)
     const header = [
@@ -703,6 +845,14 @@ export default function App() {
             >
               Bắt đầu nhập hàng
             </button>
+
+            <button 
+              onClick={toggleFullScreen}
+              className="w-full py-3.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <Maximize size={20} className="text-purple-600" />
+              Toàn màn hình
+            </button>
           </div>
 
           {/* Today's Orders List */}
@@ -793,14 +943,25 @@ export default function App() {
           </button>
           <button 
             id="btn-home"
-            onClick={() => {
-              setCurrentScreen('welcome');
-              setOrderNumberInput('');
-            }} 
+            onClick={handleGoHome} 
             className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
             title="Về trang chủ"
           >
             <Home size={20} />
+          </button>
+          <button 
+            onClick={handleSwitchApp}
+            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            title="Chuyển ứng dụng"
+          >
+            <Layers size={20} />
+          </button>
+          <button 
+            onClick={handleExitApp}
+            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            title="Thoát ứng dụng"
+          >
+            <LogOut size={20} />
           </button>
         </div>
       </header>
@@ -1221,17 +1382,28 @@ function CustomModal({ modal, onClose }: { modal: ModalState, onClose: () => voi
   if (!modal.isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="bg-white/95 backdrop-blur-md rounded-2xl p-6 max-w-sm w-full shadow-2xl border border-white/20">
         <h3 className="text-lg font-bold text-gray-900 mb-2">{modal.title}</h3>
         <p className="text-gray-600 mb-6">{modal.message}</p>
-        <div className="flex justify-end gap-3">
-          {modal.type === 'confirm' && (
+        <div className="flex flex-wrap justify-end gap-3">
+          {(modal.type === 'confirm' || modal.type === 'three-way') && (
             <button 
               onClick={onClose}
               className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-xl font-medium transition-colors"
             >
-              Hủy
+              {modal.cancelText || 'Hủy'}
+            </button>
+          )}
+          {modal.type === 'three-way' && (
+            <button 
+              onClick={() => {
+                if (modal.onSecondary) modal.onSecondary();
+                onClose();
+              }}
+              className="px-4 py-2 bg-gray-200 text-gray-800 hover:bg-gray-300 rounded-xl font-medium transition-colors"
+            >
+              {modal.secondaryText || 'Không lưu'}
             </button>
           )}
           <button 
@@ -1241,7 +1413,7 @@ function CustomModal({ modal, onClose }: { modal: ModalState, onClose: () => voi
             }}
             className="px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-xl font-medium transition-colors"
           >
-            {modal.type === 'confirm' ? 'Đồng ý' : 'Đóng'}
+            {modal.type === 'alert' ? 'Đóng' : (modal.confirmText || 'Đồng ý')}
           </button>
         </div>
       </div>
