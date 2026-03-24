@@ -7,15 +7,21 @@ import { downloadUserGuideDocx } from './utils/generateDocx';
 import Joyride, { STATUS, Step } from 'react-joyride';
 import Papa from 'papaparse';
 
+interface LocationPair {
+  location: string;
+  quantity: string;
+}
+
 interface Record {
   id: string;
   type?: 'soan_hang' | 'nhap_hang';
   orderNumber: string;
   pickerName: string;
-  location: string; // Vị trí thực tế
+  location: string; // Vị trí thực tế (legacy/first)
   productLocation: string; // Vị trí mã hàng (từ QR)
   productName: string;
-  quantity: string;
+  quantity: string; // Số lượng thực tế (legacy/first)
+  multiLocations?: LocationPair[]; // Multiple locations and quantities
   note?: string;
   transferToLocation?: string; // Vị trí chuyển đến (chỉ cho Nhập hàng)
   createdAt: number;
@@ -104,6 +110,7 @@ export default function App() {
   const [productLocation, setProductLocation] = useState('');
   const [productName, setProductName] = useState('');
   const [quantity, setQuantity] = useState('');
+  const [multiLocations, setMultiLocations] = useState<LocationPair[]>([]);
   const [note, setNote] = useState('');
   const [transferToLocation, setTransferToLocation] = useState('');
   
@@ -170,6 +177,10 @@ export default function App() {
           target: '#btn-help-docx',
           content: 'Bạn cũng có thể tải file hướng dẫn chi tiết bằng Word tại đây để in ra nếu cần.',
         },
+        {
+          target: '#btn-exit',
+          content: 'Nút THOÁT (Màu Đỏ nhấp nháy) giúp bạn đóng ứng dụng nhanh chóng.',
+        },
       ];
     }
     
@@ -206,7 +217,11 @@ export default function App() {
         },
         {
           target: '#btn-home',
-          content: 'Bấm vào đây để quay lại màn hình chính khi hoàn tất.',
+          content: 'Nút HOME (Màu Trắng) giúp bạn quay lại màn hình chính bất cứ lúc nào.',
+        },
+        {
+          target: '#btn-exit',
+          content: 'Nút THOÁT (Màu Đỏ nhấp nháy) giúp bạn đóng ứng dụng nhanh chóng khi xong việc.',
         },
       ];
     }
@@ -248,7 +263,11 @@ export default function App() {
         },
         {
           target: '#btn-home',
-          content: 'Quay lại màn hình chính.',
+          content: 'Quay lại màn hình chính bằng nút HOME màu trắng.',
+        },
+        {
+          target: '#btn-exit',
+          content: 'Thoát ứng dụng bằng nút THOÁT màu đỏ nhấp nháy.',
         },
       ];
     }
@@ -300,7 +319,7 @@ export default function App() {
 
   // Navigation Guard: Check for unsaved changes
   const hasUnsavedChanges = () => {
-    return !!(location || productName || quantity || note || maBravo || khachHang);
+    return !!(location || productName || quantity || note || maBravo || khachHang || multiLocations.length > 0);
   };
 
   // Prevent browser reload
@@ -313,7 +332,7 @@ export default function App() {
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
-  }, [location, productName, quantity, note, maBravo, khachHang]);
+  }, [location, productName, quantity, note, maBravo, khachHang, multiLocations]);
 
   // Handle browser back button
   useEffect(() => {
@@ -335,7 +354,7 @@ export default function App() {
 
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
-  }, [currentScreen, scanningField, location, productName, quantity, note, maBravo, khachHang]);
+  }, [currentScreen, scanningField, location, productName, quantity, note, maBravo, khachHang, multiLocations]);
 
   // When scanner opens, push a state to handle back button
   useEffect(() => {
@@ -613,8 +632,26 @@ export default function App() {
     setScanningField(null);
   };
 
+  const addLocationPair = () => {
+    if (!location || !quantity) {
+      showAlert('Vui lòng nhập đầy đủ Vị trí và Số lượng');
+      return;
+    }
+    if (!/^[A-Z]-\d{3}-\d{2}$/.test(location)) {
+      showAlert('Vị trí không đúng định dạng (VD: A-001-01)');
+      return;
+    }
+    setMultiLocations([...multiLocations, { location, quantity }]);
+    setLocation('');
+    setQuantity('');
+  };
+
+  const removeLocationPair = (index: number) => {
+    setMultiLocations(multiLocations.filter((_, i) => i !== index));
+  };
+
   const handleAddOrUpdateRecord = () => {
-    if (!location && !productName && !quantity) {
+    if (!location && !productName && !quantity && multiLocations.length === 0) {
       showAlert('Vui lòng nhập ít nhất một thông tin sản phẩm (Vị trí, Tên SP, hoặc Số lượng)');
       return;
     }
@@ -623,7 +660,7 @@ export default function App() {
       // Update existing record
       setRecords(records.map(r => 
         r.id === editingId 
-          ? { ...r, location, productLocation, productName, quantity, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
+          ? { ...r, location, productLocation, productName, quantity, multiLocations, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
           : r
       ));
       setEditingId(null);
@@ -639,6 +676,7 @@ export default function App() {
         productLocation,
         productName,
         quantity,
+        multiLocations,
         note,
         transferToLocation,
         createdAt: Date.now(),
@@ -669,6 +707,7 @@ export default function App() {
     setProductLocation('');
     setProductName('');
     setQuantity('');
+    setMultiLocations([]);
     setNote('');
     setTransferToLocation('');
     setMaBravo('');
@@ -690,6 +729,7 @@ export default function App() {
     setProductLocation(record.productLocation || '');
     setProductName(record.productName);
     setQuantity(record.quantity);
+    setMultiLocations(record.multiLocations || []);
     setNote(record.note || '');
     setTransferToLocation(record.transferToLocation || '');
     setMaBravo(record.maBravo || '');
@@ -712,6 +752,7 @@ export default function App() {
     setProductLocation('');
     setProductName('');
     setQuantity('');
+    setMultiLocations([]);
     setNote('');
     setTransferToLocation('');
     setMaBravo('');
@@ -801,8 +842,35 @@ export default function App() {
       'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Loại', 'Ghi chú'
     ].map(escapeCSV).join(',');
     
-    const rows = currentOrderRecords.map(r => 
-      [
+    const rows = currentOrderRecords.flatMap(r => {
+      // If there are multiple locations, create a row for each
+      if (r.multiLocations && r.multiLocations.length > 0) {
+        return r.multiLocations.map(pair => [
+          new Date(r.createdAt).toLocaleDateString('vi-VN'),
+          r.maBravo || '', 
+          r.productName || '', 
+          r.khachHang || '',
+          r.orderNumber || '', 
+          r.dvt || '', 
+          r.slThucXuat || '', 
+          r.quiCach || '', 
+          r.slBaoCay || '', 
+          r.slLe || '', 
+          r.productLocation || r.thongTinMaHang || '', 
+          r.nhanVienQuanHang || '', 
+          r.trongLuong || '', 
+          r.taiTrongXe || '',
+          r.transferToLocation || '',
+          r.pickerName || '', 
+          pair.location || '', 
+          pair.quantity || '',
+          r.type === 'nhap_hang' ? 'Nhập hàng' : 'Soạn hàng',
+          r.note || ''
+        ]);
+      }
+      
+      // Fallback for single location or legacy records
+      return [[
         new Date(r.createdAt).toLocaleDateString('vi-VN'),
         r.maBravo || '', 
         r.productName || '', 
@@ -823,8 +891,9 @@ export default function App() {
         r.quantity || '',
         r.type === 'nhap_hang' ? 'Nhập hàng' : 'Soạn hàng',
         r.note || ''
-      ].map(escapeCSV).join(',')
-    );
+      ]];
+    }).map(row => row.map(escapeCSV).join(','));
+
     // Add BOM for Excel UTF-8 compatibility
     const content = '\uFEFF' + [header, ...rows].join('\n');
     
@@ -933,7 +1002,17 @@ export default function App() {
           }
         }}
       />
-        <div className="bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-white/20 w-full max-w-md space-y-6 text-center">
+        <div className="relative bg-white/90 backdrop-blur-md p-8 rounded-2xl shadow-xl border border-white/20 w-full max-w-md space-y-6 text-center">
+          {/* Exit button for Welcome screen */}
+          <button 
+            id="btn-exit"
+            onClick={handleExitApp}
+            className="absolute -top-4 -right-4 p-3 bg-red-500 text-white rounded-2xl shadow-lg hover:bg-red-600 hover:scale-110 active:scale-95 transition-all animate-pulse-red border-2 border-red-400 flex flex-col items-center min-w-[50px] z-10"
+            title="Thoát"
+          >
+            <LogOut size={20} />
+            <span className="text-[8px] font-black uppercase">Thoát</span>
+          </button>
           <div className="w-16 h-16 bg-blue-100 text-blue-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
             <ShoppingCart size={32} />
           </div>
@@ -1117,10 +1196,11 @@ export default function App() {
           <button 
             id="btn-home"
             onClick={handleGoHome} 
-            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            className="bg-white p-2 rounded-xl shadow-[0_0_20px_rgba(255,255,255,0.6)] hover:scale-115 active:scale-90 transition-all flex flex-col items-center min-w-[60px] border-2 border-white group"
             title="Về trang chủ"
           >
-            <Home size={20} />
+            <Home size={22} className={`${currentScreen === 'nhap_hang' ? 'text-amber-600' : 'text-blue-600'} group-hover:scale-110 transition-transform`} />
+            <span className={`text-[10px] font-black uppercase tracking-tighter ${currentScreen === 'nhap_hang' ? 'text-amber-600' : 'text-blue-600'}`}>Home</span>
           </button>
           <button 
             onClick={handleSwitchApp}
@@ -1130,11 +1210,13 @@ export default function App() {
             <Layers size={20} />
           </button>
           <button 
+            id="btn-exit"
             onClick={handleExitApp}
-            className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
+            className="bg-red-500 p-2 rounded-xl shadow-[0_0_20px_rgba(239,68,68,0.6)] hover:bg-red-600 hover:scale-115 active:scale-90 transition-all flex flex-col items-center min-w-[60px] border-2 border-red-400 group animate-pulse-red"
             title="Thoát ứng dụng"
           >
-            <LogOut size={20} />
+            <LogOut size={22} className="text-white group-hover:scale-110 transition-transform" />
+            <span className="text-[10px] font-black uppercase tracking-tighter text-white">Thoát</span>
           </button>
         </div>
       </header>
@@ -1185,17 +1267,8 @@ export default function App() {
                   placeholder="Nhập hoặc quét mã..."
                 />
 
-                <ScanInput 
-                  id="transfer-to-location-input"
-                  label="4. Vị trí chuyển đến (Chuyển kho)" 
-                  value={transferToLocation} 
-                  onChange={setTransferToLocation} 
-                  onScanClick={() => setScanningField('transferToLocation')} 
-                  placeholder="Nhập hoặc quét mã chuyển đến..."
-                />
-                
                 <div id="quantity-input">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">5. Số lượng</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng tại vị trí này</label>
                   <input 
                     type="number" 
                     value={quantity}
@@ -1205,6 +1278,36 @@ export default function App() {
                   />
                 </div>
 
+                <button 
+                  onClick={addLocationPair}
+                  className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-dashed border-amber-300 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold"
+                >
+                  <Plus size={18} /> Thêm vị trí & số lượng này
+                </button>
+
+                {multiLocations.length > 0 && (
+                  <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 space-y-2">
+                    <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
+                    {multiLocations.map((pair, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-200 shadow-sm">
+                        <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-amber-600 mx-1">→</span> {pair.quantity}</span>
+                        <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <ScanInput 
+                  id="transfer-to-location-input"
+                  label="4. Vị trí chuyển đến (Chuyển kho)" 
+                  value={transferToLocation} 
+                  onChange={setTransferToLocation} 
+                  onScanClick={() => setScanningField('transferToLocation')} 
+                  placeholder="Nhập hoặc quét mã chuyển đến..."
+                />
+                
                 <div id="note-input">
                   <label className="block text-sm font-medium text-gray-700 mb-1">6. Ghi chú</label>
                   <textarea 
@@ -1276,7 +1379,7 @@ export default function App() {
                 />
                 
                 <div id="quantity-input">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">6. Số lượng thực tế</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">6. Số lượng thực tế tại vị trí này</label>
                   <input 
                     type="number" 
                     value={quantity}
@@ -1285,6 +1388,27 @@ export default function App() {
                     placeholder="Nhập số lượng..."
                   />
                 </div>
+
+                <button 
+                  onClick={addLocationPair}
+                  className="w-full py-2.5 bg-blue-50 text-blue-700 rounded-xl border border-dashed border-blue-300 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold"
+                >
+                  <Plus size={18} /> Thêm vị trí & số lượng này
+                </button>
+
+                {multiLocations.length > 0 && (
+                  <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-2">
+                    <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
+                    {multiLocations.map((pair, idx) => (
+                      <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-blue-200 shadow-sm">
+                        <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-blue-600 mx-1">→</span> {pair.quantity}</span>
+                        <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
+                          <X size={16} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </>
             )}
           </div>
@@ -1292,9 +1416,9 @@ export default function App() {
           <button 
             id="btn-add-record"
             onClick={handleAddOrUpdateRecord}
-            disabled={!quantity || isNaN(Number(quantity)) || Number(quantity) <= 0 || !/^[A-Z]-\d{3}-\d{2}$/.test(location) || !productName.trim()}
+            disabled={multiLocations.length === 0 || !productName.trim()}
             className={`w-full mt-4 py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
-              (!quantity || isNaN(Number(quantity)) || Number(quantity) <= 0 || !/^[A-Z]-\d{3}-\d{2}$/.test(location) || !productName.trim())
+              (multiLocations.length === 0 || !productName.trim())
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : editingId 
                   ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm' 
@@ -1424,10 +1548,6 @@ export default function App() {
                     <span className="font-medium text-gray-900">{currentRecord?.productLocation || '-'}</span>
                   </div>
                 )}
-                <div className="flex justify-between border-b border-black/5 pb-2">
-                  <span className="text-gray-500">Vị trí thực tế:</span>
-                  <span className="font-medium text-gray-900">{currentRecord?.location || '-'}</span>
-                </div>
                 {currentRecord?.transferToLocation && (
                   <div className="flex justify-between border-b border-black/5 pb-2">
                     <span className="text-gray-500">Vị trí chuyển đến:</span>
@@ -1456,10 +1576,33 @@ export default function App() {
                     <span className="font-medium text-gray-900">{currentRecord?.slThucXuat} {currentRecord?.dvt}</span>
                   </div>
                 )}
-                <div className={`flex justify-between pt-1 items-center ${currentScreen === 'nhap_hang' && currentRecord?.note ? 'border-b border-black/5 pb-2' : ''}`}>
-                  <span className="text-gray-500">Số lượng:</span>
-                  <span className={`font-bold text-base px-2 py-0.5 rounded-md ${currentScreen === 'nhap_hang' ? 'text-amber-700 bg-amber-100' : 'text-blue-600 bg-blue-100'}`}>{currentRecord?.quantity || '-'}</span>
-                </div>
+                {/* Multi-location display in Review */}
+                {currentRecord?.multiLocations && currentRecord.multiLocations.length > 0 ? (
+                  <div className="border-b border-black/5 pb-2">
+                    <span className="text-gray-500 block mb-1">Vị trí & Số lượng thực tế:</span>
+                    <div className="space-y-1">
+                      {currentRecord.multiLocations.map((pair, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-white/50 px-2 py-1 rounded border border-black/5">
+                          <span className="font-medium text-gray-700">{pair.location}</span>
+                          <span className={`font-bold ${currentScreen === 'nhap_hang' ? 'text-amber-700' : 'text-blue-600'}`}>
+                            {pair.quantity}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">Vị trí thực tế:</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.location || '-'}</span>
+                    </div>
+                    <div className={`flex justify-between pt-1 items-center ${currentScreen === 'nhap_hang' && currentRecord?.note ? 'border-b border-black/5 pb-2' : ''}`}>
+                      <span className="text-gray-500">Số lượng:</span>
+                      <span className={`font-bold text-base px-2 py-0.5 rounded-md ${currentScreen === 'nhap_hang' ? 'text-amber-700 bg-amber-100' : 'text-blue-600 bg-blue-100'}`}>{currentRecord?.quantity || '-'}</span>
+                    </div>
+                  </>
+                )}
                 {currentScreen === 'nhap_hang' && currentRecord?.note && (
                   <div className="flex justify-between pt-1 items-center">
                     <span className="text-gray-500">Ghi chú:</span>

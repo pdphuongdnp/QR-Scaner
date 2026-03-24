@@ -25,14 +25,14 @@ export const downloadUserGuideDocx = async () => {
         properties: {},
         children: [
           new Paragraph({
-            text: "HƯỚNG DẪN SỬ DỤNG ỨNG DỤNG QUẢN LÝ KHO DNP",
+            text: "HƯỚNG DẪN SỬ DỤNG ỨNG DỤNG QUẢN LÝ KHO DNP (CẬP NHẬT)",
             heading: HeadingLevel.HEADING_1,
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 },
           }),
           new Paragraph({
             children: [
-              new TextRun("Chào mừng bạn đến với ứng dụng quản lý kho chuyên nghiệp. Tài liệu này sẽ giúp bạn làm quen với ứng dụng một cách dễ dàng nhất, ngay cả khi bạn không rành về công nghệ."),
+              new TextRun("Chào mừng bạn đến với ứng dụng quản lý kho chuyên nghiệp. Tài liệu này sẽ giúp bạn làm quen với các tính năng mới nhất, giúp việc soạn hàng và nhập hàng trở nên nhanh chóng và chính xác hơn."),
             ],
             spacing: { after: 200 },
           }),
@@ -56,9 +56,29 @@ export const downloadUserGuideDocx = async () => {
             ],
             bullet: { level: 0 },
           }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Các nút điều hướng quan trọng: ", bold: true }),
+            ],
+            bullet: { level: 0 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Nút HOME (Màu Trắng): ", bold: true }),
+              new TextRun("Nằm ở góc trên bên trái, giúp bạn quay lại màn hình chính bất cứ lúc nào."),
+            ],
+            bullet: { level: 1 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Nút THOÁT (Màu Đỏ - Nhấp nháy): ", bold: true }),
+              new TextRun("Nằm ở góc trên bên phải, được thiết kế nổi bật để bạn dễ dàng thoát ứng dụng khi hoàn tất công việc."),
+            ],
+            bullet: { level: 1 },
+          }),
 
           new Paragraph({
-            text: "2. Các bước bắt đầu (Màn hình chính)",
+            text: "2. Màn hình chính (Chào mừng)",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           }),
@@ -78,8 +98,11 @@ export const downloadUserGuideDocx = async () => {
             spacing: { after: 200 },
           }),
           new Paragraph({ text: "1. Nhập tên của bạn: Nhập tên vào ô \"Người soạn / Người nhập\".", bullet: { level: 0 } }),
-          new Paragraph({ text: "2. Nhập số đơn hàng: Bạn có thể tự gõ hoặc bấm nút biểu tượng mã QR bên cạnh để quét mã trên phiếu.", bullet: { level: 0 } }),
-          new Paragraph({ text: "3. Chọn chế độ làm việc:", bullet: { level: 0 } }),
+          new Paragraph({ text: "2. Nhập số đơn hàng: Bạn có thể tự gõ hoặc quét mã trên phiếu.", bullet: { level: 0 } }),
+          new Paragraph({ text: "3. Nhập dữ liệu từ File (Mới): Bấm nút \"Nhập File CSV\" để làm tiếp đơn hàng cũ.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Hệ thống sẽ cảnh báo nếu file đã được nhập trước đó.", bullet: { level: 1 } }),
+          new Paragraph({ text: "Đơn hàng trùng số sẽ được tự động thêm hậu tố -1, -2 để giữ tính độc lập.", bullet: { level: 1 } }),
+          new Paragraph({ text: "4. Chọn chế độ làm việc:", bullet: { level: 0 } }),
           new Paragraph({ text: "Bấm nút Màu Xanh Dương nếu bạn đi SOẠN HÀNG.", bullet: { level: 1 } }),
           new Paragraph({ text: "Bấm nút Màu Vàng nếu bạn đi NHẬP HÀNG.", bullet: { level: 1 } }),
 
@@ -103,7 +126,7 @@ export const downloadUserGuideDocx = async () => {
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
           }),
-          new Paragraph({ text: "Bước 1 - Quét mã sản phẩm: Bấm nút to nhất ở trên cùng để quét mã QR dán trên sản phẩm. Ứng dụng sẽ tự động hiện ra tên hàng, mã hàng...", bullet: { level: 0 } }),
+          new Paragraph({ text: "Bước 1 - Quét mã sản phẩm: Bấm nút to nhất ở trên cùng để quét mã QR dán trên sản phẩm.", bullet: { level: 0 } }),
           new Paragraph({ text: "Bước 2 - Nhập vị trí: Nhập vị trí bạn lấy hàng (Ví dụ: A-001-01).", bullet: { level: 0 } }),
           new Paragraph({ text: "Bước 3 - Nhập số lượng: Gõ số lượng thực tế bạn đã lấy.", bullet: { level: 0 } }),
           new Paragraph({ text: "Bước 4 - Thêm vào danh sách: Bấm nút \"Thêm vào danh sách\" ở dưới cùng.", bullet: { level: 0 } }),
@@ -134,7 +157,7 @@ export const downloadUserGuideDocx = async () => {
           new Paragraph({ text: "Bước 4: Bấm nút \"Thêm vào danh sách\".", bullet: { level: 0 } }),
 
           new Paragraph({
-            text: "5. Kiểm tra và Gửi dữ liệu",
+            text: "5. Kiểm tra và Ghi dữ liệu",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           }),
@@ -142,14 +165,16 @@ export const downloadUserGuideDocx = async () => {
           new Paragraph({ text: "1. Duyệt danh sách: Vuốt sang trái hoặc phải ở khung dưới cùng để xem lại các món đã quét.", bullet: { level: 0 } }),
           new Paragraph({ text: "2. Sửa/Xóa: Nếu nhập sai, bạn có thể bấm nút \"Sửa\" hoặc \"Xóa\" ngay trên thẻ hàng đó.", bullet: { level: 0 } }),
           new Paragraph({ text: "3. Tải file dữ liệu: Khi đã hoàn thành toàn bộ đơn hàng, hãy bấm nút \"Ghi dữ liệu (Tải File CSV)\" ở dưới cùng.", bullet: { level: 0 } }),
+          new Paragraph({ text: "File tải về có thể được dùng để \"Nhập File CSV\" lại vào ứng dụng nếu cần bổ sung thêm sau này.", bullet: { level: 1 } }),
 
           new Paragraph({
             text: "6. Một số lưu ý quan trọng",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           }),
-          new Paragraph({ text: "Mã QR: Hãy giữ camera thẳng và đủ ánh sáng để máy quét nhanh hơn.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Lưu trữ: Ứng dụng sẽ tự lưu các đơn hàng bạn đã làm trong ngày. Nếu lỡ tay thoát ra, bạn chỉ cần nhập lại tên và số đơn cũ để làm tiếp.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Nút Thoát & Home: Luôn hiển thị rõ ràng ở thanh tiêu đề. Nút Thoát có hiệu ứng nhấp nháy đỏ để bạn dễ thấy nhất.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Chống trùng lặp File: Ứng dụng cảnh báo nếu bạn tải lên cùng một file nhiều lần.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Xử lý trùng đơn: Đơn hàng trùng số sẽ được tách riêng (ví dụ: Đơn 123 và Đơn 123-1), đảm bảo tính độc lập.", bullet: { level: 0 } }),
           new Paragraph({ text: "Màu sắc: Nhớ quy tắc: Xanh = Soạn đi, Vàng = Nhập vào.", bullet: { level: 0 } }),
 
           new Paragraph({

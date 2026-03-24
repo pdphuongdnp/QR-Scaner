@@ -20,3 +20,14 @@
 .markdown-body hr { @apply my-6 border-gray-200; }
 .markdown-body img { @apply rounded-xl shadow-md my-4 max-w-full h-auto; }
 .markdown-body strong { @apply font-bold text-gray-900; }
+
+@layer utilities {
+  .animate-pulse-red {
+    animation: pulse-red 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+  }
+}
+
+@keyframes pulse-red {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+  70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); }
+}
