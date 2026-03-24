@@ -651,8 +651,19 @@ export default function App() {
   };
 
   const handleAddOrUpdateRecord = () => {
-    if (!location && !productName && !quantity && multiLocations.length === 0) {
-      showAlert('Vui lòng nhập ít nhất một thông tin sản phẩm (Vị trí, Tên SP, hoặc Số lượng)');
+    let finalMultiLocations = [...multiLocations];
+    // If there's leftover data in the inputs, add it to multiLocations automatically
+    if (location && quantity && /^[A-Z]-\d{3}-\d{2}$/.test(location)) {
+      finalMultiLocations.push({ location, quantity });
+    }
+
+    if (finalMultiLocations.length === 0) {
+      showAlert('Vui lòng thêm ít nhất một vị trí và số lượng (bấm nút "Thêm vị trí" hoặc nhập đầy đủ)');
+      return;
+    }
+
+    if (!productName.trim()) {
+      showAlert('Vui lòng nhập hoặc quét tên sản phẩm');
       return;
     }
     
@@ -660,7 +671,7 @@ export default function App() {
       // Update existing record
       setRecords(records.map(r => 
         r.id === editingId 
-          ? { ...r, location, productLocation, productName, quantity, multiLocations, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
+          ? { ...r, location: finalMultiLocations[0].location, productLocation, productName, quantity: finalMultiLocations[0].quantity, multiLocations: finalMultiLocations, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
           : r
       ));
       setEditingId(null);
@@ -672,11 +683,11 @@ export default function App() {
         type: currentScreen === 'nhap_hang' ? 'nhap_hang' : 'soan_hang',
         orderNumber: activeOrderNumber,
         pickerName,
-        location,
+        location: finalMultiLocations[0].location,
         productLocation,
         productName,
-        quantity,
-        multiLocations,
+        quantity: finalMultiLocations[0].quantity,
+        multiLocations: finalMultiLocations,
         note,
         transferToLocation,
         createdAt: Date.now(),
@@ -1238,6 +1249,15 @@ export default function App() {
           <div className="space-y-3">
             {currentScreen === 'nhap_hang' ? (
               <>
+                <div className="pb-2">
+                  <button
+                    onClick={() => setScanningField('productQR')}
+                    className="w-full py-3 bg-amber-100 text-amber-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-amber-200 transition-colors border border-amber-200"
+                  >
+                    <QrCode size={20} /> Quét QR sản phẩm (nếu có)
+                  </button>
+                </div>
+
                 <ScanInput 
                   label="1. Người nhập" 
                   value={pickerName} 
@@ -1258,65 +1278,72 @@ export default function App() {
                   />
                 </div>
 
-                <ScanInput 
-                  id="location-input"
-                  label="3. Vị trí thực tế (VD: A-001-01)" 
-                  value={location} 
-                  onChange={setLocation} 
-                  onScanClick={() => setScanningField('location')} 
-                  placeholder="Nhập hoặc quét mã..."
-                />
-
-                <div id="quantity-input">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng tại vị trí này</label>
-                  <input 
-                    type="number" 
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
-                    placeholder="Nhập số lượng..."
+                <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
+                  <ScanInput 
+                    id="location-input"
+                    label="3. Vị trí thực tế (VD: A-001-01)" 
+                    value={location} 
+                    onChange={setLocation} 
+                    onScanClick={() => setScanningField('location')} 
+                    placeholder="Nhập hoặc quét mã..."
+                    disabled={!productName.trim() && !editingId}
                   />
-                </div>
 
-                <button 
-                  onClick={addLocationPair}
-                  className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-dashed border-amber-300 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold"
-                >
-                  <Plus size={18} /> Thêm vị trí & số lượng này
-                </button>
-
-                {multiLocations.length > 0 && (
-                  <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 space-y-2">
-                    <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
-                    {multiLocations.map((pair, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-200 shadow-sm">
-                        <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-amber-600 mx-1">→</span> {pair.quantity}</span>
-                        <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
+                  <div id="quantity-input">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng tại vị trí này</label>
+                    <input 
+                      type="number" 
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      disabled={!productName.trim() && !editingId}
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all disabled:bg-gray-50"
+                      placeholder="Nhập số lượng..."
+                    />
                   </div>
-                )}
 
-                <ScanInput 
-                  id="transfer-to-location-input"
-                  label="4. Vị trí chuyển đến (Chuyển kho)" 
-                  value={transferToLocation} 
-                  onChange={setTransferToLocation} 
-                  onScanClick={() => setScanningField('transferToLocation')} 
-                  placeholder="Nhập hoặc quét mã chuyển đến..."
-                />
-                
-                <div id="note-input">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">6. Ghi chú</label>
-                  <textarea 
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                    rows={3}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all"
-                    placeholder="Nhập ghi chú..."
+                  <button 
+                    onClick={addLocationPair}
+                    disabled={!productName.trim() && !editingId}
+                    className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-dashed border-amber-300 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50"
+                  >
+                    <Plus size={18} /> Thêm vị trí & số lượng này
+                  </button>
+
+                  {multiLocations.length > 0 && (
+                    <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 space-y-2 mt-2">
+                      <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
+                      {multiLocations.map((pair, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-200 shadow-sm">
+                          <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-amber-600 mx-1">→</span> {pair.quantity}</span>
+                          <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <ScanInput 
+                    id="transfer-to-location-input"
+                    label="4. Vị trí chuyển đến (Chuyển kho)" 
+                    value={transferToLocation} 
+                    onChange={setTransferToLocation} 
+                    onScanClick={() => setScanningField('transferToLocation')} 
+                    placeholder="Nhập hoặc quét mã chuyển đến..."
+                    disabled={!productName.trim() && !editingId}
                   />
+                  
+                  <div id="note-input">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">6. Ghi chú</label>
+                    <textarea 
+                      value={note}
+                      onChange={(e) => setNote(e.target.value)}
+                      rows={3}
+                      disabled={!productName.trim() && !editingId}
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all disabled:bg-gray-50"
+                      placeholder="Nhập ghi chú..."
+                    />
+                  </div>
                 </div>
               </>
             ) : (
@@ -1348,67 +1375,72 @@ export default function App() {
                   disabled={true}
                 />
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">3. Vị trí mã hàng</label>
-                  <textarea 
-                    value={productLocation}
-                    disabled={true}
-                    rows={8}
-                    className="w-full p-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed outline-none resize-none"
-                    placeholder="Trích xuất từ QR..."
-                  />
-                </div>
-
-                <ScanInput 
-                  id="product-name-display"
-                  label="4. Tên sản phẩm" 
-                  value={productName} 
-                  onChange={() => {}} 
-                  onScanClick={() => {}} 
-                  placeholder="Tên sản phẩm"
-                  disabled={true}
-                />
-
-                <ScanInput 
-                  id="location-input"
-                  label="5. Vị trí thực tế (VD: A-001-01)" 
-                  value={location} 
-                  onChange={setLocation} 
-                  onScanClick={() => setScanningField('location')} 
-                  placeholder="Nhập hoặc quét mã..."
-                />
-                
-                <div id="quantity-input">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">6. Số lượng thực tế tại vị trí này</label>
-                  <input 
-                    type="number" 
-                    value={quantity}
-                    onChange={(e) => setQuantity(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
-                    placeholder="Nhập số lượng..."
-                  />
-                </div>
-
-                <button 
-                  onClick={addLocationPair}
-                  className="w-full py-2.5 bg-blue-50 text-blue-700 rounded-xl border border-dashed border-blue-300 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold"
-                >
-                  <Plus size={18} /> Thêm vị trí & số lượng này
-                </button>
-
-                {multiLocations.length > 0 && (
-                  <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-2">
-                    <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
-                    {multiLocations.map((pair, idx) => (
-                      <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-blue-200 shadow-sm">
-                        <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-blue-600 mx-1">→</span> {pair.quantity}</span>
-                        <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
-                          <X size={16} />
-                        </button>
-                      </div>
-                    ))}
+                <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">3. Vị trí mã hàng</label>
+                    <textarea 
+                      value={productLocation}
+                      disabled={true}
+                      rows={8}
+                      className="w-full p-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed outline-none resize-none"
+                      placeholder="Trích xuất từ QR..."
+                    />
                   </div>
-                )}
+
+                  <ScanInput 
+                    id="product-name-display"
+                    label="4. Tên sản phẩm" 
+                    value={productName} 
+                    onChange={() => {}} 
+                    onScanClick={() => {}} 
+                    placeholder="Tên sản phẩm"
+                    disabled={true}
+                  />
+
+                  <ScanInput 
+                    id="location-input"
+                    label="5. Vị trí thực tế (VD: A-001-01)" 
+                    value={location} 
+                    onChange={setLocation} 
+                    onScanClick={() => setScanningField('location')} 
+                    placeholder="Nhập hoặc quét mã..."
+                    disabled={!productName.trim() && !editingId}
+                  />
+                  
+                  <div id="quantity-input">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">6. Số lượng thực tế tại vị trí này</label>
+                    <input 
+                      type="number" 
+                      value={quantity}
+                      onChange={(e) => setQuantity(e.target.value)}
+                      disabled={!productName.trim() && !editingId}
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50"
+                      placeholder="Nhập số lượng..."
+                    />
+                  </div>
+
+                  <button 
+                    onClick={addLocationPair}
+                    disabled={!productName.trim() && !editingId}
+                    className="w-full py-2.5 bg-blue-50 text-blue-700 rounded-xl border border-dashed border-blue-300 hover:bg-blue-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50"
+                  >
+                    <Plus size={18} /> Thêm vị trí & số lượng này
+                  </button>
+
+                  {multiLocations.length > 0 && (
+                    <div className="bg-blue-50/50 p-3 rounded-xl border border-blue-100 space-y-2 mt-2">
+                      <h4 className="text-xs font-bold text-blue-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
+                      {multiLocations.map((pair, idx) => (
+                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-blue-200 shadow-sm">
+                          <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-blue-600 mx-1">→</span> {pair.quantity}</span>
+                          <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
+                            <X size={16} />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>
@@ -1416,9 +1448,9 @@ export default function App() {
           <button 
             id="btn-add-record"
             onClick={handleAddOrUpdateRecord}
-            disabled={multiLocations.length === 0 || !productName.trim()}
+            disabled={(!productName.trim() && !editingId) || (multiLocations.length === 0 && (!location || !quantity))}
             className={`w-full mt-4 py-3 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors ${
-              (multiLocations.length === 0 || !productName.trim())
+              ((!productName.trim() && !editingId) || (multiLocations.length === 0 && (!location || !quantity)))
                 ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                 : editingId 
                   ? 'bg-blue-600 hover:bg-blue-700 text-white shadow-sm' 
