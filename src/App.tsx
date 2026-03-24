@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
-import { format } from 'date-fns';
-import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { format, parse } from 'date-fns';
+import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers, Upload } from 'lucide-react';
 import { Scanner } from './components/Scanner';
 import { GuideModal } from './components/GuideModal';
 import { downloadUserGuideDocx } from './utils/generateDocx';
 import Joyride, { STATUS, Step } from 'react-joyride';
+import Papa from 'papaparse';
 
 interface Record {
   id: string;
@@ -87,9 +88,18 @@ export default function App() {
     return localStorage.getItem('qr_scanner_active_order') || '';
   });
   const [orderNumberInput, setOrderNumberInput] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [pickerName, setPickerName] = useState(() => {
     return localStorage.getItem('qr_scanner_picker_name') || '';
   });
+  const [importedFiles, setImportedFiles] = useState<{name: string, lastModified: number, size: number}[]>(() => {
+    const saved = localStorage.getItem('qr_scanner_imported_files');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_imported_files', JSON.stringify(importedFiles));
+  }, [importedFiles]);
   const [location, setLocation] = useState('');
   const [productLocation, setProductLocation] = useState('');
   const [productName, setProductName] = useState('');
@@ -251,11 +261,13 @@ export default function App() {
     setTimeout(() => setToastMessage(null), 3000);
   };
 
-  // Derived state: records for the CURRENT order only
-  const currentOrderRecords = records.filter(r => 
-    r.orderNumber === activeOrderNumber && 
-    (currentScreen === 'nhap_hang' ? r.type === 'nhap_hang' : r.type !== 'nhap_hang')
-  );
+  // Derived state: records for the CURRENT order only, sorted by newest first
+  const currentOrderRecords = records
+    .filter(r => 
+      r.orderNumber === activeOrderNumber && 
+      (currentScreen === 'nhap_hang' ? r.type === 'nhap_hang' : r.type !== 'nhap_hang')
+    )
+    .sort((a, b) => b.createdAt - a.createdAt);
 
   // Clamp review index during render to prevent out-of-bounds blank items
   const safeReviewIndex = Math.max(0, Math.min(reviewIndex, currentOrderRecords.length - 1));
@@ -385,6 +397,143 @@ export default function App() {
       if (document.exitFullscreen) {
         document.exitFullscreen();
       }
+    }
+  };
+
+  const handleImportCSV = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const fileInfo = { name: file.name, lastModified: file.lastModified, size: file.size };
+    const isAlreadyImported = importedFiles.some(f => 
+      f.name === fileInfo.name && 
+      f.lastModified === fileInfo.lastModified && 
+      f.size === fileInfo.size
+    );
+
+    const proceedWithImport = () => {
+      Papa.parse(file, {
+        header: true,
+        skipEmptyLines: true,
+        complete: (results) => {
+          // Try to extract timestamp from filename if it matches our format: S_123_23Mar26_150000_Phuong.csv
+          // Format: ddMMMyy_HHmmss
+          let fileTimestamp: number | null = null;
+          const fileNameParts = file.name.split('_');
+          if (fileNameParts.length >= 4) {
+            const datePart = fileNameParts[fileNameParts.length - 3]; // 23Mar26
+            const timePart = fileNameParts[fileNameParts.length - 2]; // 150000
+            try {
+              const parsed = parse(`${datePart}_${timePart}`, 'ddMMMyy_HHmmss', new Date());
+              if (!isNaN(parsed.getTime())) {
+                fileTimestamp = parsed.getTime();
+              }
+            } catch (e) {
+              console.error('Error parsing timestamp from filename:', e);
+            }
+          }
+
+          const importedRecords: Record[] = results.data.map((row: any, index: number) => {
+            const type = row['Loại'] === 'Nhập hàng' ? 'nhap_hang' : 'soan_hang';
+            
+            // Use file timestamp if available, otherwise parse from 'Ngày' column, otherwise use current time
+            // Add index to ensure unique timestamps for records in the same file
+            let createdAt = (fileTimestamp || Date.now()) + index;
+            
+            if (!fileTimestamp && row['Ngày']) {
+              try {
+                const parsedDate = parse(row['Ngày'], 'dd/MM/yyyy', new Date());
+                if (!isNaN(parsedDate.getTime())) {
+                  createdAt = parsedDate.getTime() + index;
+                }
+              } catch (e) {
+                console.error('Error parsing date:', e);
+              }
+            }
+
+            return {
+              id: crypto.randomUUID(),
+              type,
+              orderNumber: row['Đơn hàng'] || '',
+              pickerName: row['Người soạn/nhập'] || '',
+              location: row['Vị trí thực tế'] || '',
+              productLocation: row['Thông tin mã hàng'] || '',
+              thongTinMaHang: row['Thông tin mã hàng'] || '',
+              productName: row['Tên sản phẩm'] || '',
+              quantity: row['Số lượng thực tế'] || '',
+              note: row['Ghi chú'] || '',
+              transferToLocation: row['Vị trí chuyển đến'] || '',
+              createdAt,
+              maBravo: row['Mã Bravo'] || '',
+              khachHang: row['Khách hàng'] || '',
+              dvt: row['ĐVT'] || '',
+              slThucXuat: row['SL Thực Xuất(cái)'] || '',
+              quiCach: row['Qui cách(Bao/Cây)'] || '',
+              slBaoCay: row['SL (Bao/Cây)'] || '',
+              slLe: row['SL Lẻ'] || '',
+              nhanVienQuanHang: row['Nhân viên quản hàng'] || '',
+              trongLuong: row['Trọng lượng(kg)'] || '',
+              taiTrongXe: row['Tải trọng xe(kg)'] || ''
+            };
+          });
+
+          if (importedRecords.length > 0) {
+            setRecords(prev => {
+              // Map to store the final order number for each unique order number in the imported file
+              const orderNumberMap: { [key: string]: string } = {};
+              const uniqueImportedOrders = Array.from(new Set(importedRecords.map(r => r.orderNumber)));
+              const existingOrders = Array.from(new Set(prev.map(r => r.orderNumber)));
+              const usedInThisImport = new Set<string>();
+
+              uniqueImportedOrders.forEach(originalOrder => {
+                if (!originalOrder) {
+                  orderNumberMap[originalOrder] = '';
+                  return;
+                }
+
+                if (!existingOrders.includes(originalOrder) && !usedInThisImport.has(originalOrder)) {
+                  orderNumberMap[originalOrder] = originalOrder;
+                  usedInThisImport.add(originalOrder);
+                } else {
+                  // Find the next available suffix
+                  let suffix = 1;
+                  let newOrder = `${originalOrder}-${suffix}`;
+                  while (existingOrders.includes(newOrder) || usedInThisImport.has(newOrder)) {
+                    suffix++;
+                    newOrder = `${originalOrder}-${suffix}`;
+                  }
+                  orderNumberMap[originalOrder] = newOrder;
+                  usedInThisImport.add(newOrder);
+                }
+              });
+
+              // Apply the mapped order numbers to the imported records
+              const finalImportedRecords = importedRecords.map(r => ({
+                ...r,
+                orderNumber: orderNumberMap[r.orderNumber] || r.orderNumber
+              }));
+
+              return [...prev, ...finalImportedRecords];
+            });
+            setImportedFiles(prev => [...prev, fileInfo]);
+            showToast(`Đã nhập thành công ${importedRecords.length} bản ghi!`);
+          } else {
+            showAlert('Không tìm thấy dữ liệu hợp lệ trong file.');
+          }
+          
+          // Reset file input
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        },
+        error: (error) => {
+          showAlert(`Lỗi khi đọc file: ${error.message}`);
+        }
+      });
+    };
+
+    if (isAlreadyImported) {
+      showConfirm(`File "${file.name}" đã được nhập trước đó. Bạn có muốn nhập lại (tạo bản sao dữ liệu) không?`, proceedWithImport, 'File đã tồn tại');
+    } else {
+      proceedWithImport();
     }
   };
 
@@ -700,11 +849,15 @@ export default function App() {
     // Keep pickerName so they don't have to retype it
   };
 
-  // Calculate today's orders for Welcome screen
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
-  const todayRecords = records.filter(r => r.createdAt >= todayStart.getTime());
-  const todayOrders = Array.from(new Set(todayRecords.map(r => r.orderNumber))).filter(Boolean) as string[];
+  // Calculate orders for Welcome screen
+  // Show all unique order numbers, sorted by newest first
+  const allOrders = Array.from(new Set(records.map(r => r.orderNumber)))
+    .filter(Boolean)
+    .sort((a, b) => {
+      const aTime = records.find(r => r.orderNumber === a)?.createdAt || 0;
+      const bTime = records.find(r => r.orderNumber === b)?.createdAt || 0;
+      return bTime - aTime;
+    }) as string[];
 
   const handleStartOrder = (order: string) => {
     if (!order || !pickerName) {
@@ -853,22 +1006,42 @@ export default function App() {
               <Maximize size={20} className="text-purple-600" />
               Toàn màn hình
             </button>
+
+            <input 
+              type="file" 
+              ref={fileInputRef} 
+              onChange={handleImportCSV} 
+              accept=".csv" 
+              className="hidden" 
+            />
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-full py-3.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm"
+            >
+              <Upload size={20} className="text-green-600" />
+              Tải lên File CSV (Import)
+            </button>
           </div>
 
-          {/* Today's Orders List */}
-          {todayOrders.length > 0 && (
+          {/* Orders List */}
+          {allOrders.length > 0 && (
             <div className="mt-8 text-left w-full border-t border-gray-100 pt-6">
               <h3 className="text-sm font-medium text-gray-500 mb-3 flex items-center gap-2">
-                <History size={16} /> Đơn hàng đã quét hôm nay
+                <History size={16} /> Danh sách đơn hàng
               </h3>
-              <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                {todayOrders.map(order => (
+              <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
+                {allOrders.map(order => (
                   <button
                     key={order}
                     onClick={() => handleResumeOrder(order)}
                     className="w-full p-3 bg-gray-50 hover:bg-blue-50 border border-gray-100 rounded-xl text-left flex items-center justify-between group transition-colors"
                   >
-                    <span className="font-medium text-gray-700 group-hover:text-blue-700 truncate pr-2">{order}</span>
+                    <div className="flex flex-col truncate pr-2">
+                      <span className="font-medium text-gray-700 group-hover:text-blue-700 truncate">{order}</span>
+                      <span className="text-xs text-gray-400">
+                        {format(records.find(r => r.orderNumber === order)?.createdAt || Date.now(), 'dd/MM/yyyy HH:mm')}
+                      </span>
+                    </div>
                     <ChevronRight size={18} className="text-gray-400 group-hover:text-blue-500 flex-shrink-0" />
                   </button>
                 ))}
