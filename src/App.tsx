@@ -497,45 +497,57 @@ export default function App() {
           });
 
           if (importedRecords.length > 0) {
-            setRecords(prev => {
-              // Map to store the final order number for each unique order number in the imported file
-              const orderNumberMap: { [key: string]: string } = {};
-              const uniqueImportedOrders = Array.from(new Set(importedRecords.map(r => r.orderNumber)));
-              const existingOrders = Array.from(new Set(prev.map(r => r.orderNumber)));
-              const usedInThisImport = new Set<string>();
+            // Map to store the final order number for each unique order number in the imported file
+            const orderNumberMap: { [key: string]: string } = {};
+            const uniqueImportedOrders = Array.from(new Set(importedRecords.map(r => r.orderNumber)));
+            const existingOrders = Array.from(new Set(records.map(r => r.orderNumber)));
+            const usedInThisImport = new Set<string>();
 
-              uniqueImportedOrders.forEach(originalOrder => {
-                if (!originalOrder) {
-                  orderNumberMap[originalOrder] = '';
-                  return;
+            uniqueImportedOrders.forEach(originalOrder => {
+              if (!originalOrder) {
+                orderNumberMap[originalOrder] = '';
+                return;
+              }
+
+              if (!existingOrders.includes(originalOrder) && !usedInThisImport.has(originalOrder)) {
+                orderNumberMap[originalOrder] = originalOrder;
+                usedInThisImport.add(originalOrder);
+              } else {
+                // Find the next available suffix
+                let suffix = 1;
+                let newOrder = `${originalOrder}-${suffix}`;
+                while (existingOrders.includes(newOrder) || usedInThisImport.has(newOrder)) {
+                  suffix++;
+                  newOrder = `${originalOrder}-${suffix}`;
                 }
-
-                if (!existingOrders.includes(originalOrder) && !usedInThisImport.has(originalOrder)) {
-                  orderNumberMap[originalOrder] = originalOrder;
-                  usedInThisImport.add(originalOrder);
-                } else {
-                  // Find the next available suffix
-                  let suffix = 1;
-                  let newOrder = `${originalOrder}-${suffix}`;
-                  while (existingOrders.includes(newOrder) || usedInThisImport.has(newOrder)) {
-                    suffix++;
-                    newOrder = `${originalOrder}-${suffix}`;
-                  }
-                  orderNumberMap[originalOrder] = newOrder;
-                  usedInThisImport.add(newOrder);
-                }
-              });
-
-              // Apply the mapped order numbers to the imported records
-              const finalImportedRecords = importedRecords.map(r => ({
-                ...r,
-                orderNumber: orderNumberMap[r.orderNumber] || r.orderNumber
-              }));
-
-              return [...prev, ...finalImportedRecords];
+                orderNumberMap[originalOrder] = newOrder;
+                usedInThisImport.add(newOrder);
+              }
             });
+
+            // Apply the mapped order numbers to the imported records
+            const finalImportedRecords = importedRecords.map(r => ({
+              ...r,
+              orderNumber: orderNumberMap[r.orderNumber] || r.orderNumber
+            }));
+
+            setRecords(prev => [...prev, ...finalImportedRecords]);
             setImportedFiles(prev => [...prev, fileInfo]);
-            showToast(`Đã nhập thành công ${importedRecords.length} bản ghi!`);
+            
+            // Automatically select the first new order and switch to picking screen
+            const firstNewRecord = finalImportedRecords.find(r => r.orderNumber);
+            if (firstNewRecord) {
+              setActiveOrderNumber(firstNewRecord.orderNumber);
+              setOrderNumberInput(firstNewRecord.orderNumber);
+              // If picker name is empty, try to set it from the imported record
+              if (!pickerName && firstNewRecord.pickerName) {
+                setPickerName(firstNewRecord.pickerName);
+              }
+              setCurrentScreen('soan_hang');
+              showToast(`Đã nhập ${importedRecords.length} bản ghi. Đang mở đơn ${firstNewRecord.orderNumber}...`);
+            } else {
+              showToast(`Đã nhập thành công ${importedRecords.length} bản ghi!`);
+            }
           } else {
             showAlert('Không tìm thấy dữ liệu hợp lệ trong file.');
           }
