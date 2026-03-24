@@ -848,13 +848,15 @@ export default function App() {
     // 1. Nhập: N_ddMMMyy_hhmmss_tên người nhập
     // 2. Soạn: S_số đơn hàng_ddMMMyy_hhmmss_tên người soạn
     const isNhap = currentOrderRecords.some(r => r.type === 'nhap_hang');
-    const timestamp = format(new Date(), 'ddMMMyy_HHmmss');
+    const now = new Date();
+    const timestamp = format(now, 'ddMMMyy_HHmmss');
+    const fileCreationTime = format(now, 'dd/MM/yyyy HH:mm:ss');
     let fileName = '';
     
     if (isNhap) {
-      fileName = `N_${timestamp}_${pickerName}.csv`;
+      fileName = `NF_${timestamp}_${pickerName}.csv`;
     } else {
-      fileName = `S_${activeOrderNumber}_${timestamp}_${pickerName}.csv`;
+      fileName = `SF_${activeOrderNumber}_${timestamp}_${pickerName}.csv`;
     }
     
     // Create content (comma separated)
@@ -862,7 +864,7 @@ export default function App() {
       'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'Đơn hàng', 'ĐVT', 
       'SL Thực Xuất(cái)', 'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 
       'Thông tin mã hàng', 'Nhân viên quản hàng', 'Trọng lượng(kg)', 'Tải trọng xe(kg)',
-      'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Loại', 'Ghi chú'
+      'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Loại', 'Ghi chú', 'Ngày giờ tạo file'
     ].map(escapeCSV).join(',');
     
     const rows = currentOrderRecords.flatMap(r => {
@@ -888,7 +890,8 @@ export default function App() {
           pair.location || '', 
           pair.quantity || '',
           r.type === 'nhap_hang' ? 'Nhập hàng' : 'Soạn hàng',
-          r.note || ''
+          r.note || '',
+          fileCreationTime
         ]);
       }
       
@@ -913,7 +916,8 @@ export default function App() {
         r.location || '', 
         r.quantity || '',
         r.type === 'nhap_hang' ? 'Nhập hàng' : 'Soạn hàng',
-        r.note || ''
+        r.note || '',
+        fileCreationTime
       ]];
     }).map(row => row.map(escapeCSV).join(','));
 
