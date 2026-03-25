@@ -453,15 +453,42 @@ export default function App() {
           }
 
           const importedRecords: Record[] = results.data.map((row: any, index: number) => {
-            const type = row['Loại'] === 'Nhập hàng' ? 'nhap_hang' : 'soan_hang';
+            // Helper to find value by matching headers loosely
+            const getValue = (possibleHeaders: string[]) => {
+              const normalizedRow = Object.keys(row).reduce((acc, key) => {
+                acc[key.toLowerCase().trim().replace(/\s+/g, ' ')] = row[key];
+                return acc;
+              }, {} as any);
+
+              for (const h of possibleHeaders) {
+                const normalizedH = h.toLowerCase().trim().replace(/\s+/g, ' ');
+                if (normalizedRow[normalizedH] !== undefined) {
+                  return normalizedRow[normalizedH];
+                }
+                // Also try without any spaces at all for maximum robustness
+                const noSpaceH = normalizedH.replace(/\s+/g, '');
+                const noSpaceRow = Object.keys(row).reduce((acc, key) => {
+                  acc[key.toLowerCase().replace(/\s+/g, '')] = row[key];
+                  return acc;
+                }, {} as any);
+                if (noSpaceRow[noSpaceH] !== undefined) {
+                  return noSpaceRow[noSpaceH];
+                }
+              }
+              return '';
+            };
+
+            const typeValue = getValue(['Loại', 'Type']);
+            const type = typeValue === 'Nhập hàng' ? 'nhap_hang' : 'soan_hang';
             
             // Use file timestamp if available, otherwise parse from 'Ngày' column, otherwise use current time
             // Add index to ensure unique timestamps for records in the same file
             let createdAt = (fileTimestamp || Date.now()) + index;
             
-            if (!fileTimestamp && row['Ngày']) {
+            const ngayValue = getValue(['Ngày', 'Date']);
+            if (!fileTimestamp && ngayValue) {
               try {
-                const parsedDate = parse(row['Ngày'], 'dd/MM/yyyy', new Date());
+                const parsedDate = parse(ngayValue, 'dd/MM/yyyy', new Date());
                 if (!isNaN(parsedDate.getTime())) {
                   createdAt = parsedDate.getTime() + index;
                 }
@@ -470,29 +497,31 @@ export default function App() {
               }
             }
 
+            const infoMaHang = getValue(['Thông tin mã hàng', 'Vị trí mã hàng', 'Product Location']);
+
             return {
               id: crypto.randomUUID(),
               type,
-              orderNumber: row['Đơn hàng'] || '',
-              pickerName: row['Người soạn/nhập'] || '',
-              location: row['Vị trí thực tế'] || '',
-              productLocation: row['Thông tin mã hàng'] || '',
-              thongTinMaHang: row['Thông tin mã hàng'] || '',
-              productName: row['Tên sản phẩm'] || '',
-              quantity: row['Số lượng thực tế'] || '',
-              note: row['Ghi chú'] || '',
-              transferToLocation: row['Vị trí chuyển đến'] || '',
+              orderNumber: getValue(['Đơn hàng', 'Order Number', 'Số đơn hàng']) || '',
+              pickerName: getValue(['Người soạn/nhập', 'Người soạn', 'Người nhập', 'Picker Name']) || '',
+              location: getValue(['Vị trí thực tế', 'Vị trí', 'Location']) || '',
+              productLocation: infoMaHang || '',
+              thongTinMaHang: infoMaHang || '',
+              productName: getValue(['Tên sản phẩm', 'Tên hàng', 'Product Name']) || '',
+              quantity: getValue(['Số lượng thực tế', 'Số lượng', 'Quantity']) || '',
+              note: getValue(['Ghi chú', 'Note']) || '',
+              transferToLocation: getValue(['Vị trí chuyển đến', 'Transfer To']) || '',
               createdAt,
-              maBravo: row['Mã Bravo'] || '',
-              khachHang: row['Khách hàng'] || '',
-              dvt: row['ĐVT'] || '',
-              slThucXuat: row['SL Thực Xuất(cái)'] || '',
-              quiCach: row['Qui cách(Bao/Cây)'] || '',
-              slBaoCay: row['SL (Bao/Cây)'] || '',
-              slLe: row['SL Lẻ'] || '',
-              nhanVienQuanHang: row['Nhân viên quản hàng'] || '',
-              trongLuong: row['Trọng lượng(kg)'] || '',
-              taiTrongXe: row['Tải trọng xe(kg)'] || ''
+              maBravo: getValue(['Mã Bravo', 'Bravo Code']) || '',
+              khachHang: getValue(['Khách hàng', 'Customer']) || '',
+              dvt: getValue(['ĐVT', 'Unit']) || '',
+              slThucXuat: getValue(['SL Thực Xuất (cái)', 'SL Thực Xuất(cái)', 'SL Thực Xuất']) || '',
+              quiCach: getValue(['Qui cách (Bao/Cây)', 'Qui cách(Bao/Cây)', 'Qui cách']) || '',
+              slBaoCay: getValue(['SL (Bao/Cây)', 'SL(Bao/Cây)', 'Số lượng bao/cây']) || '',
+              slLe: getValue(['SL Lẻ', 'Số lượng lẻ']) || '',
+              nhanVienQuanHang: getValue(['Nhân viên quản hàng']) || '',
+              trongLuong: getValue(['Trọng lượng(kg)', 'Trọng lượng']) || '',
+              taiTrongXe: getValue(['Tải trọng xe(kg)', 'Tải trọng']) || ''
             };
           });
 
@@ -862,7 +891,7 @@ export default function App() {
     // Create content (comma separated)
     const header = [
       'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'Đơn hàng', 'ĐVT', 
-      'SL Thực Xuất(cái)', 'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 
+      'SL Thực Xuất (cái)', 'Qui cách (Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 
       'Thông tin mã hàng', 'Nhân viên quản hàng', 'Trọng lượng(kg)', 'Tải trọng xe(kg)',
       'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Loại', 'Ghi chú', 'Ngày giờ tạo file'
     ].map(escapeCSV).join(',');
