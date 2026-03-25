@@ -1524,17 +1524,17 @@ export default function App() {
                   <span className="text-gray-500">Khách hàng:</span>
                   <span className="font-medium text-gray-900">{khachHang}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-100 pb-1 items-center">
-                  <span className="text-gray-500">SL Thực Xuất (cái):</span>
-                  <span className="font-bold text-lg bg-blue-600 text-white px-2 py-0.5 rounded-md">{slThucXuat} {dvt}</span>
+                <div className="flex justify-between border-b border-gray-100 p-2 items-center bg-blue-600 text-white rounded-lg mb-1">
+                  <span className="font-medium">SL Thực Xuất (cái):</span>
+                  <span className="font-bold text-lg">{slThucXuat} {dvt}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-100 pb-1">
                   <span className="text-gray-500">Qui cách (Bao/Cây):</span>
                   <span className="font-medium text-gray-900">{quiCach}</span>
                 </div>
-                <div className="flex justify-between border-b border-gray-100 pb-1 items-center">
-                  <span className="text-gray-500">SL (Bao/Cây):</span>
-                  <span className="font-bold text-lg bg-blue-600 text-white px-2 py-0.5 rounded-md">{slBaoCay}</span>
+                <div className="flex justify-between border-b border-gray-100 p-2 items-center bg-blue-600 text-white rounded-lg mb-1">
+                  <span className="font-medium">SL (Bao/Cây):</span>
+                  <span className="font-bold text-lg">{slBaoCay}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-100 pb-1">
                   <span className="text-gray-500">SL Lẻ:</span>
@@ -1649,9 +1649,9 @@ export default function App() {
                 </div>
                 {currentScreen !== 'nhap_hang' && (
                   <>
-                    <div className="flex justify-between border-b border-black/5 pb-2 items-center">
-                      <span className="text-gray-500">SL Thực Xuất (cái):</span>
-                      <span className="font-bold text-lg bg-blue-600 text-white px-2 py-0.5 rounded-md">
+                    <div className="flex justify-between border-b border-black/5 p-2 items-center bg-blue-600 text-white rounded-lg mb-1">
+                      <span className="font-medium">SL Thực Xuất (cái):</span>
+                      <span className="font-bold text-lg">
                         {currentRecord?.slThucXuat || '-'} {currentRecord?.slThucXuat ? currentRecord?.dvt : ''}
                       </span>
                     </div>
@@ -1659,9 +1659,9 @@ export default function App() {
                       <span className="text-gray-500">Qui cách (Bao/Cây):</span>
                       <span className="font-medium text-gray-900">{currentRecord?.quiCach || '-'}</span>
                     </div>
-                    <div className="flex justify-between border-b border-black/5 pb-2 items-center">
-                      <span className="text-gray-500">SL (Bao/Cây):</span>
-                      <span className="font-bold text-lg bg-blue-600 text-white px-2 py-0.5 rounded-md">
+                    <div className="flex justify-between border-b border-black/5 p-2 items-center bg-blue-600 text-white rounded-lg mb-1">
+                      <span className="font-medium">SL (Bao/Cây):</span>
+                      <span className="font-bold text-lg">
                         {currentRecord?.slBaoCay || '-'}
                       </span>
                     </div>
