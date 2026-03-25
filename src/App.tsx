@@ -396,10 +396,27 @@ export default function App() {
 
   const handleExitApp = () => {
     showConfirm('Bạn có chắc chắn muốn thoát ứng dụng không?', () => {
-      // Try to close window (only works if opened by script or in some PWA contexts)
+      // 1. Try to close the window
       window.close();
-      // Fallback for PWA/standalone: redirect to a blank page or show a "Goodbye" screen
-      showAlert('Ứng dụng đã sẵn sàng để đóng. Vui lòng vuốt ứng dụng đi để thoát hoàn toàn.');
+      
+      // 2. Try Android Home Intent (Common for Android scanners/PWAs)
+      try {
+        window.location.href = "intent://#Intent;action=android.intent.action.MAIN;category=android.intent.category.HOME;end";
+      } catch (e) {
+        console.error("Home intent failed", e);
+      }
+
+      // 3. Fallback to blank page
+      setTimeout(() => {
+        if (window.location.href !== "about:blank") {
+          window.location.href = "about:blank";
+        }
+      }, 300);
+
+      // 4. Final fallback message
+      setTimeout(() => {
+        showAlert('Ứng dụng đã sẵn sàng để đóng. Nếu ứng dụng không tự đóng, vui lòng vuốt ứng dụng đi để thoát hoàn toàn.', 'Thông báo');
+      }, 800);
     }, 'Thoát ứng dụng');
   };
 
@@ -712,7 +729,7 @@ export default function App() {
       // Update existing record
       setRecords(records.map(r => 
         r.id === editingId 
-          ? { ...r, location: finalMultiLocations[0].location, productLocation, productName, quantity: finalMultiLocations[0].quantity, multiLocations: finalMultiLocations, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
+          ? { ...r, pickerName, location: finalMultiLocations[0].location, productLocation, productName, quantity: finalMultiLocations[0].quantity, multiLocations: finalMultiLocations, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
           : r
       ));
       setEditingId(null);
@@ -1558,12 +1575,12 @@ export default function App() {
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2">
               <FileText size={18} className="text-gray-500" /> 
-              Duyệt đơn này {currentOrderRecords.length > 0 ? `(${safeReviewIndex + 1}/${currentOrderRecords.length})` : '(0)'}
+              {currentScreen === 'nhap_hang' ? 'Duyệt đợt nhập này' : 'Duyệt đơn này'} {currentOrderRecords.length > 0 ? `(${safeReviewIndex + 1}/${currentOrderRecords.length})` : '(0)'}
             </h2>
             {currentOrderRecords.length > 0 && (
               <button 
                 onClick={() => {
-                  showConfirm('Bạn có chắc muốn xóa TẤT CẢ dữ liệu của đơn hàng này?', () => {
+                  showConfirm(`Bạn có chắc muốn xóa TẤT CẢ dữ liệu của ${currentScreen === 'nhap_hang' ? 'đợt nhập' : 'đơn hàng'} này?`, () => {
                     setRecords(prev => {
                       const updated = prev.filter(r => r.orderNumber !== activeOrderNumber);
                       localStorage.setItem('qr_scanner_records', JSON.stringify(updated));
@@ -1587,19 +1604,19 @@ export default function App() {
                     setTrongLuong('');
                     setTaiTrongXe('');
                     setReviewIndex(0);
-                    showToast('Đã xóa toàn bộ đơn hàng!');
+                    showToast(`Đã xóa toàn bộ ${currentScreen === 'nhap_hang' ? 'đợt nhập' : 'đơn hàng'}!`);
                   });
                 }}
                 className="text-sm text-red-500 hover:text-red-700 font-medium"
               >
-                Xóa đơn này
+                {currentScreen === 'nhap_hang' ? 'Xóa đợt nhập này' : 'Xóa đơn này'}
               </button>
             )}
           </div>
           
           {currentOrderRecords.length === 0 ? (
             <div className="text-center py-8 text-gray-400 text-sm">
-              Đơn hàng này chưa có dữ liệu.<br/>Hãy quét mã và thêm vào danh sách.
+              {currentScreen === 'nhap_hang' ? 'Đợt nhập này chưa có dữ liệu.' : 'Đơn hàng này chưa có dữ liệu.'}<br/>Hãy quét mã và thêm vào danh sách.
             </div>
           ) : (
             <div className="space-y-4">
