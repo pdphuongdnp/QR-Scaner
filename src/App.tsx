@@ -1496,19 +1496,19 @@ export default function App() {
                   <span className="font-medium text-gray-900">{khachHang}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-100 pb-1">
-                  <span className="text-gray-500">SL yêu cầu:</span>
-                  <span className="font-medium text-gray-900">{slThucXuat}</span>
+                  <span className="text-gray-500">SL Thực Xuất (cái):</span>
+                  <span className="font-medium text-gray-900">{slThucXuat} {dvt}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-100 pb-1">
-                  <span className="text-gray-500">Qui cách bao:</span>
+                  <span className="text-gray-500">Qui cách (Bao/Cây):</span>
                   <span className="font-medium text-gray-900">{quiCach}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-100 pb-1">
-                  <span className="text-gray-500">SL bao cần xuất:</span>
+                  <span className="text-gray-500">SL (Bao/Cây):</span>
                   <span className="font-medium text-gray-900">{slBaoCay}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-100 pb-1">
-                  <span className="text-gray-500">SL lẻ:</span>
+                  <span className="text-gray-500">SL Lẻ:</span>
                   <span className="font-medium text-gray-900">{slLe}</span>
                 </div>
                 <div className="flex justify-between border-b border-gray-100 pb-1">
@@ -1618,11 +1618,25 @@ export default function App() {
                   <span className="text-gray-500">Tên hàng:</span>
                   <span className="font-medium text-gray-900">{currentRecord?.productName || '-'}</span>
                 </div>
-                {currentScreen !== 'nhap_hang' && currentRecord?.slThucXuat && (
-                  <div className="flex justify-between border-b border-black/5 pb-2">
-                    <span className="text-gray-500">SL Thực Xuất:</span>
-                    <span className="font-medium text-gray-900">{currentRecord?.slThucXuat} {currentRecord?.dvt}</span>
-                  </div>
+                {currentScreen !== 'nhap_hang' && (
+                  <>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">SL Thực Xuất (cái):</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.slThucXuat || '-'} {currentRecord?.slThucXuat ? currentRecord?.dvt : ''}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">Qui cách (Bao/Cây):</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.quiCach || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">SL (Bao/Cây):</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.slBaoCay || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">SL Lẻ:</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.slLe || '-'}</span>
+                    </div>
+                  </>
                 )}
                 {/* Multi-location display in Review */}
                 {currentRecord?.multiLocations && currentRecord.multiLocations.length > 0 ? (
