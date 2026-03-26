@@ -197,7 +197,7 @@ export default function App() {
         },
         {
           target: '#location-input',
-          content: 'Nhập vị trí bạn lấy hàng vào đây. Định dạng chuẩn là X-000-00.',
+          content: 'Nhập vị trí bạn lấy hàng vào đây. Định dạng chuẩn là X-000-00 hoặc XX-000-00.',
         },
         {
           target: '#quantity-input',
@@ -695,8 +695,8 @@ export default function App() {
       showAlert('Vui lòng nhập đầy đủ Vị trí và Số lượng');
       return;
     }
-    if (!/^[A-Z]-\d{3}-\d{2}$/.test(location)) {
-      showAlert('Vị trí không đúng định dạng (VD: A-001-01)');
+    if (!/^[A-Z]{1,2}-\d{3}-\d{2}$/.test(location)) {
+      showAlert('Vị trí không đúng định dạng (VD: A-001-01 hoặc AA-001-01)');
       return;
     }
     setMultiLocations([...multiLocations, { location, quantity }]);
@@ -711,7 +711,7 @@ export default function App() {
   const handleAddOrUpdateRecord = () => {
     let finalMultiLocations = [...multiLocations];
     // If there's leftover data in the inputs, add it to multiLocations automatically
-    if (location && quantity && /^[A-Z]-\d{3}-\d{2}$/.test(location)) {
+    if (location && quantity && /^[A-Z]{1,2}-\d{3}-\d{2}$/.test(location)) {
       finalMultiLocations.push({ location, quantity });
     }
 
@@ -1343,7 +1343,7 @@ export default function App() {
                 <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
                   <ScanInput 
                     id="location-input"
-                    label="3. Vị trí thực tế (VD: A-001-01)" 
+                    label="3. Vị trí thực tế (VD: A-001-01 hoặc AA-001-01)" 
                     value={location} 
                     onChange={setLocation} 
                     onScanClick={() => setScanningField('location')} 
@@ -1461,7 +1461,7 @@ export default function App() {
 
                   <ScanInput 
                     id="location-input"
-                    label="5. Vị trí thực tế (VD: A-001-01)" 
+                    label="5. Vị trí thực tế (VD: A-001-01 hoặc AA-001-01)" 
                     value={location} 
                     onChange={setLocation} 
                     onScanClick={() => setScanningField('location')} 
@@ -1621,7 +1621,7 @@ export default function App() {
           ) : (
             <div className="space-y-4">
               {/* Current Record Card */}
-              <div className={`p-4 border rounded-xl space-y-2 text-sm transition-colors ${
+              <div className={`p-4 border rounded-xl space-y-2 text-sm transition-colors h-[450px] overflow-y-auto ${
                 editingId === currentRecord?.id 
                   ? 'border-blue-200 bg-blue-50/50' 
                   : 'border-blue-100 bg-blue-50/30'
