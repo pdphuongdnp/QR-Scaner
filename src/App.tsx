@@ -1,3 +1,5 @@
+import { jsPDF } from 'jspdf';
+import 'jspdf-autotable';
 import { useState, useEffect, useRef } from 'react';
 import { format, parse } from 'date-fns';
 import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers, Upload } from 'lucide-react';
@@ -14,7 +16,7 @@ interface LocationPair {
 
 interface Record {
   id: string;
-  type?: 'soan_hang' | 'nhap_hang';
+  type?: 'soan_hang' | 'nhap_hang' | 'xuat_hang';
   orderNumber: string;
   pickerName: string;
   location: string; // Vị trí thực tế (legacy/first)
@@ -37,6 +39,10 @@ interface Record {
   nhanVienQuanHang?: string;
   trongLuong?: string;
   taiTrongXe?: string;
+  vehicleNumber?: string; // For xuat_hang
+  pxkNumber?: string; // For xuat_hang
+  customerName?: string; // For xuat_hang
+  deliveryAddress?: string; // For xuat_hang
 }
 
 type ScanField = 'orderNumber' | 'pickerName' | 'location' | 'productName' | 'productQR' | 'welcomeOrderQR' | 'transferToLocation' | null;
@@ -54,11 +60,25 @@ type ModalState = {
 };
 
 export default function App() {
-  const [currentScreen, setCurrentScreen] = useState<'welcome' | 'soan_hang' | 'nhap_hang'>(() => {
+  const [currentScreen, setCurrentScreen] = useState<'welcome' | 'soan_hang' | 'nhap_hang' | 'xuat_hang'>(() => {
     return (localStorage.getItem('qr_scanner_current_screen') as any) || 'welcome';
   });
   
   const [modal, setModal] = useState<ModalState>({ isOpen: false, title: '', message: '', type: 'alert' });
+
+  const [vehicleNumber, setVehicleNumber] = useState(() => {
+    return localStorage.getItem('qr_scanner_vehicle_number') || '';
+  });
+  const [pxkNumber, setPxkNumber] = useState(() => {
+    return localStorage.getItem('qr_scanner_pxk_number') || '';
+  });
+  const [customerName, setCustomerName] = useState(() => {
+    return localStorage.getItem('qr_scanner_customer_name') || '';
+  });
+  const [deliveryAddress, setDeliveryAddress] = useState(() => {
+    return localStorage.getItem('qr_scanner_delivery_address') || '';
+  });
+  const [importType, setImportType] = useState<'soan' | 'nhap' | null>(null);
 
   const showAlert = (message: string, title = 'Thông báo') => {
     setModal({ isOpen: true, title, message, type: 'alert' });
@@ -102,6 +122,38 @@ export default function App() {
     const saved = localStorage.getItem('qr_scanner_imported_files');
     return saved ? JSON.parse(saved) : [];
   });
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_current_screen', currentScreen);
+  }, [currentScreen]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_vehicle_number', vehicleNumber);
+  }, [vehicleNumber]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_pxk_number', pxkNumber);
+  }, [pxkNumber]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_customer_name', customerName);
+  }, [customerName]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_delivery_address', deliveryAddress);
+  }, [deliveryAddress]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_records', JSON.stringify(records));
+  }, [records]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_active_order', activeOrderNumber);
+  }, [activeOrderNumber]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_picker_name', pickerName);
+  }, [pickerName]);
 
   useEffect(() => {
     localStorage.setItem('qr_scanner_imported_files', JSON.stringify(importedFiles));
@@ -284,7 +336,7 @@ export default function App() {
   const currentOrderRecords = records
     .filter(r => 
       r.orderNumber === activeOrderNumber && 
-      (currentScreen === 'nhap_hang' ? r.type === 'nhap_hang' : r.type !== 'nhap_hang')
+      r.type === currentScreen
     )
     .sort((a, b) => b.createdAt - a.createdAt);
 
@@ -455,6 +507,16 @@ export default function App() {
           // Try to extract timestamp from filename if it matches our format: S_123_23Mar26_150000_Phuong.csv
           // Format: ddMMMyy_HHmmss
           let fileTimestamp: number | null = null;
+          let detectedType: 'soan_hang' | 'nhap_hang' | 'xuat_hang' | null = null;
+          
+          if (file.name.startsWith('NF_') || file.name.startsWith('N_')) {
+            detectedType = 'nhap_hang';
+          } else if (file.name.startsWith('SF_') || file.name.startsWith('S_')) {
+            detectedType = 'soan_hang';
+          } else if (file.name.startsWith('XF_') || file.name.startsWith('X_')) {
+            detectedType = 'xuat_hang';
+          }
+
           const fileNameParts = file.name.split('_');
           if (fileNameParts.length >= 4) {
             const datePart = fileNameParts[fileNameParts.length - 3]; // 23Mar26
@@ -495,42 +557,58 @@ export default function App() {
               return '';
             };
 
+            // Unified mapping logic
+            const infoMaHang = getValue(['Thông tin mã hàng', 'Vị trí mã hàng', 'Product Location']);
             const typeValue = getValue(['Loại', 'Type']);
-            const type = typeValue === 'Nhập hàng' ? 'nhap_hang' : 'soan_hang';
             
+            // Determine type: precedence 1. importType button, 2. filename prefix, 3. 'Loại' column, 4. default
+            let type: 'soan_hang' | 'nhap_hang' | 'xuat_hang' = 'soan_hang';
+            if (importType === 'soan') type = 'soan_hang';
+            else if (importType === 'nhap') type = 'nhap_hang';
+            else if (detectedType) type = detectedType;
+            else if (typeValue === 'Nhập hàng') type = 'nhap_hang';
+            else if (typeValue === 'Xuất hàng') type = 'xuat_hang';
+
             // Use file timestamp if available, otherwise parse from 'Ngày' column, otherwise use current time
-            // Add index to ensure unique timestamps for records in the same file
             let createdAt = (fileTimestamp || Date.now()) + index;
-            
             const ngayValue = getValue(['Ngày', 'Date']);
             if (!fileTimestamp && ngayValue) {
               try {
-                const parsedDate = parse(ngayValue, 'dd/MM/yyyy', new Date());
-                if (!isNaN(parsedDate.getTime())) {
-                  createdAt = parsedDate.getTime() + index;
+                // Try multiple formats
+                const formats = ['dd/MM/yyyy', 'dd.MM.yyyy', 'yyyy-MM-dd'];
+                for (const f of formats) {
+                  const parsedDate = parse(ngayValue, f, new Date());
+                  if (!isNaN(parsedDate.getTime())) {
+                    createdAt = parsedDate.getTime() + index;
+                    break;
+                  }
                 }
               } catch (e) {
                 console.error('Error parsing date:', e);
               }
             }
 
-            const infoMaHang = getValue(['Thông tin mã hàng', 'Vị trí mã hàng', 'Product Location']);
+            // If it's a simple import (e.g. from Admin file), some fields might be missing
+            // We provide defaults or map from available columns
+            const orderNumber = getValue(['Đơn hàng', 'Order Number', 'Số đơn hàng']) || 
+                               (importType === 'nhap' ? `NHAP_${format(new Date(), 'ddMMMyy_HHmmss')}` : '');
 
             return {
               id: crypto.randomUUID(),
               type,
-              orderNumber: getValue(['Đơn hàng', 'Order Number', 'Số đơn hàng']) || '',
-              pickerName: getValue(['Người soạn/nhập', 'Người soạn', 'Người nhập', 'Picker Name']) || '',
+              orderNumber,
+              pickerName: getValue(['Người soạn/nhập', 'Người soạn', 'Người nhập', 'Picker Name']) || pickerName || 'Admin',
               location: getValue(['Vị trí thực tế', 'Vị trí', 'Location']) || '',
               productLocation: infoMaHang || '',
               thongTinMaHang: infoMaHang || '',
               productName: getValue(['Tên sản phẩm', 'Tên hàng', 'Product Name']) || '',
               quantity: getValue(['Số lượng thực tế', 'Số lượng', 'Quantity']) || '',
-              note: getValue(['Ghi chú', 'Note']) || '',
+              note: getValue(['Ghi chú', 'Ghi chú nhập', 'Note']) || '',
               transferToLocation: getValue(['Vị trí chuyển đến', 'Transfer To']) || '',
               createdAt,
-              maBravo: getValue(['Mã Bravo', 'Bravo Code']) || '',
+              maBravo: getValue(['Mã Bravo', 'Mã hàng', 'Mã sản phẩm', 'Code']) || '',
               khachHang: getValue(['Khách hàng', 'Customer']) || '',
+              customerName: getValue(['Khách hàng', 'Customer', 'Tên khách hàng']) || '',
               dvt: getValue(['ĐVT', 'Unit']) || '',
               slThucXuat: getValue(['SL Thực Xuất (cái)', 'SL Thực Xuất(cái)', 'SL Thực Xuất']) || '',
               quiCach: getValue(['Qui cách (Bao/Cây)', 'Qui cách(Bao/Cây)', 'Qui cách']) || '',
@@ -538,7 +616,10 @@ export default function App() {
               slLe: getValue(['SL Lẻ', 'Số lượng lẻ']) || '',
               nhanVienQuanHang: getValue(['Nhân viên quản hàng']) || '',
               trongLuong: getValue(['Trọng lượng(kg)', 'Trọng lượng']) || '',
-              taiTrongXe: getValue(['Tải trọng xe(kg)', 'Tải trọng']) || ''
+              taiTrongXe: getValue(['Tải trọng xe(kg)', 'Tải trọng']) || '',
+              vehicleNumber: getValue(['Số xe VC', 'Số xe vận chuyển', 'Vehicle Number']) || '',
+              pxkNumber: getValue(['Số PXK', 'PXK Number']) || '',
+              deliveryAddress: getValue(['ĐC Nhận hàng', 'Địa chỉ giao hàng', 'Delivery Address']) || ''
             };
           });
 
@@ -580,7 +661,7 @@ export default function App() {
             setRecords(prev => [...prev, ...finalImportedRecords]);
             setImportedFiles(prev => [...prev, fileInfo]);
             
-            // Automatically select the first new order and switch to picking screen
+            // Automatically select the first new order and switch to the correct screen
             const firstNewRecord = finalImportedRecords.find(r => r.orderNumber);
             if (firstNewRecord) {
               setActiveOrderNumber(firstNewRecord.orderNumber);
@@ -589,7 +670,7 @@ export default function App() {
               if (!pickerName && firstNewRecord.pickerName) {
                 setPickerName(firstNewRecord.pickerName);
               }
-              setCurrentScreen('soan_hang');
+              setCurrentScreen(firstNewRecord.type);
               showToast(`Đã nhập ${importedRecords.length} bản ghi. Đang mở đơn ${firstNewRecord.orderNumber}...`);
             } else {
               showToast(`Đã nhập thành công ${importedRecords.length} bản ghi!`);
@@ -729,7 +810,7 @@ export default function App() {
       // Update existing record
       setRecords(records.map(r => 
         r.id === editingId 
-          ? { ...r, pickerName, location: finalMultiLocations[0].location, productLocation, productName, quantity: finalMultiLocations[0].quantity, multiLocations: finalMultiLocations, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe } 
+          ? { ...r, pickerName, location: finalMultiLocations[0].location, productLocation, productName, quantity: finalMultiLocations[0].quantity, multiLocations: finalMultiLocations, note, transferToLocation, maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe, vehicleNumber, pxkNumber, customerName, deliveryAddress } 
           : r
       ));
       setEditingId(null);
@@ -738,7 +819,7 @@ export default function App() {
       // Add new record
       const newRecord: Record = {
         id: Math.random().toString(36).substring(7),
-        type: currentScreen === 'nhap_hang' ? 'nhap_hang' : 'soan_hang',
+        type: currentScreen === 'welcome' ? 'soan_hang' : currentScreen,
         orderNumber: activeOrderNumber,
         pickerName,
         location: finalMultiLocations[0].location,
@@ -749,16 +830,20 @@ export default function App() {
         note,
         transferToLocation,
         createdAt: Date.now(),
-        maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe
+        maBravo, khachHang, dvt, slThucXuat, quiCach, slBaoCay, slLe, thongTinMaHang, nhanVienQuanHang, trongLuong, taiTrongXe,
+        vehicleNumber, // Add vehicle number for xuat_hang
+        pxkNumber,
+        customerName,
+        deliveryAddress
       };
       setRecords([...records, newRecord]);
       setReviewIndex(99999); // Jump to the newly added record (clamped by useEffect)
       showToast('Đã thêm bản ghi mới!');
       
       // Ask if user wants to scan another item
-      const message = currentScreen === 'nhap_hang' 
-        ? 'Bạn có muốn nhập mã vị trí nhập hàng khác không?' 
-        : 'Bạn có muốn soạn mã hàng khác không?';
+      let message = 'Bạn có muốn soạn mã hàng khác không?';
+      if (currentScreen === 'nhap_hang') message = 'Bạn có muốn nhập mã vị trí nhập hàng khác không?';
+      if (currentScreen === 'xuat_hang') message = 'Bạn có muốn xuất mã hàng khác không?';
       
       setTimeout(() => {
         showConfirm(message, () => {
@@ -875,10 +960,77 @@ export default function App() {
     });
   };
 
+  const generateXuatKhoPDF = () => {
+    if (currentOrderRecords.length === 0) {
+      showAlert('Không có dữ liệu để xuất PDF');
+      return;
+    }
+
+    const doc = new jsPDF();
+    
+    // Basic Vietnamese support in jsPDF is tricky without custom fonts, 
+    // but let's try to use standard ones.
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(18);
+    doc.text('PHIEU XUAT KHO', 105, 15, { align: 'center' });
+    
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.text(`So PXK: ${pxkNumber || 'N/A'}`, 15, 25);
+    doc.text(`Ngay: ${format(new Date(), 'dd/MM/yyyy')}`, 15, 30);
+    doc.text(`Khach hang: ${customerName || 'N/A'}`, 15, 35);
+    doc.text(`Dia chi: ${deliveryAddress || 'N/A'}`, 15, 40);
+    doc.text(`So xe: ${vehicleNumber || 'N/A'}`, 15, 45);
+    doc.text(`Nguoi xuat: ${pickerName || 'N/A'}`, 15, 50);
+
+    const tableData = currentOrderRecords.map((r, index) => [
+      index + 1,
+      r.maBravo || '',
+      r.productName || '',
+      r.dvt || '',
+      r.quantity || '',
+      r.location || '',
+      r.note || ''
+    ]);
+
+    (doc as any).autoTable({
+      startY: 55,
+      head: [['STT', 'Ma hang', 'Ten hang', 'DVT', 'S.Luong', 'Vi tri', 'Ghi chu']],
+      body: tableData,
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
+      styles: { fontSize: 8, cellPadding: 2 },
+      columnStyles: {
+        0: { cellWidth: 10 },
+        1: { cellWidth: 25 },
+        2: { cellWidth: 50 },
+        3: { cellWidth: 15 },
+        4: { cellWidth: 20 },
+        5: { cellWidth: 25 },
+        6: { cellWidth: 35 }
+      }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY + 10;
+    doc.text('Nguoi nhan hang', 40, finalY);
+    doc.text('(Ky, ho ten)', 40, finalY + 5);
+    
+    doc.text('Nguoi xuat kho', 140, finalY);
+    doc.text('(Ky, ho ten)', 140, finalY + 5);
+
+    doc.save(`Phieu_Xuat_Kho_${activeOrderNumber}.pdf`);
+    showToast('Đã xuất file PDF thành công!');
+  };
+
   const handleDownload = () => {
     if (currentOrderRecords.length === 0) {
       showAlert('Không có dữ liệu để tải xuống');
       return;
+    }
+
+    if (currentScreen === 'xuat_hang') {
+      generateXuatKhoPDF();
+      // Continue to CSV export to support Power Query as requested
     }
 
     const escapeCSV = (str: string) => {
@@ -893,7 +1045,9 @@ export default function App() {
     // Format:
     // 1. Nhập: N_ddMMMyy_hhmmss_tên người nhập
     // 2. Soạn: S_số đơn hàng_ddMMMyy_hhmmss_tên người soạn
+    // 3. Xuất: X_số đơn hàng_ddMMMyy_hhmmss_tên người xuất
     const isNhap = currentOrderRecords.some(r => r.type === 'nhap_hang');
+    const isXuat = currentOrderRecords.some(r => r.type === 'xuat_hang');
     const now = new Date();
     const timestamp = format(now, 'ddMMMyy_HHmmss');
     const fileCreationTime = format(now, 'dd/MM/yyyy HH:mm:ss');
@@ -901,26 +1055,34 @@ export default function App() {
     
     if (isNhap) {
       fileName = `NF_${timestamp}_${pickerName}.csv`;
+    } else if (isXuat) {
+      fileName = `XF_${activeOrderNumber}_${timestamp}_${pickerName}.csv`;
     } else {
       fileName = `SF_${activeOrderNumber}_${timestamp}_${pickerName}.csv`;
     }
     
     // Create content (comma separated)
     const header = [
-      'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'Đơn hàng', 'ĐVT', 
-      'SL Thực Xuất (cái)', 'Qui cách (Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 
-      'Thông tin mã hàng', 'Nhân viên quản hàng', 'Trọng lượng(kg)', 'Tải trọng xe(kg)',
+      'STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'ĐC Nhận hàng', 
+      'Số PXK', 'Số xe VC', 'Đơn hàng', 'ĐVT', 'SL Thực Xuất(cái)', 
+      'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 'Thông tin mã hàng', 
+      'Nhân viên quản hàng', 'Trọng lượng( kg)', 'Tải trọng xe(kg)',
       'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Loại', 'Ghi chú', 'Ngày giờ tạo file'
     ].map(escapeCSV).join(',');
     
+    let stt = 1;
     const rows = currentOrderRecords.flatMap(r => {
       // If there are multiple locations, create a row for each
       if (r.multiLocations && r.multiLocations.length > 0) {
         return r.multiLocations.map(pair => [
-          new Date(r.createdAt).toLocaleDateString('vi-VN'),
+          stt++,
+          format(r.createdAt, 'dd/MM/yyyy'),
           r.maBravo || '', 
           r.productName || '', 
-          r.khachHang || '',
+          r.khachHang || r.customerName || '',
+          r.deliveryAddress || '',
+          r.pxkNumber || '',
+          r.vehicleNumber || '',
           r.orderNumber || '', 
           r.dvt || '', 
           r.slThucXuat || '', 
@@ -935,7 +1097,7 @@ export default function App() {
           r.pickerName || '', 
           pair.location || '', 
           pair.quantity || '',
-          r.type === 'nhap_hang' ? 'Nhập hàng' : 'Soạn hàng',
+          r.type === 'nhap_hang' ? 'Nhập hàng' : (r.type === 'xuat_hang' ? 'Xuất hàng' : 'Soạn hàng'),
           r.note || '',
           fileCreationTime
         ]);
@@ -943,10 +1105,14 @@ export default function App() {
       
       // Fallback for single location or legacy records
       return [[
-        new Date(r.createdAt).toLocaleDateString('vi-VN'),
+        stt++,
+        format(r.createdAt, 'dd/MM/yyyy'),
         r.maBravo || '', 
         r.productName || '', 
-        r.khachHang || '',
+        r.khachHang || r.customerName || '',
+        r.deliveryAddress || '',
+        r.pxkNumber || '',
+        r.vehicleNumber || '',
         r.orderNumber || '', 
         r.dvt || '', 
         r.slThucXuat || '', 
@@ -961,7 +1127,7 @@ export default function App() {
         r.pickerName || '', 
         r.location || '', 
         r.quantity || '',
-        r.type === 'nhap_hang' ? 'Nhập hàng' : 'Soạn hàng',
+        r.type === 'nhap_hang' ? 'Nhập hàng' : (r.type === 'xuat_hang' ? 'Xuất hàng' : 'Soạn hàng'),
         r.note || '',
         fileCreationTime
       ]];
@@ -1007,17 +1173,11 @@ export default function App() {
       return;
     }
     
-    // Extract location if it was scanned along with the order
-    // Assuming the user might type it manually or scan it. 
-    // If they scan the 13-field QR, we already extracted the order number.
-    // We need a separate field for order location on the welcome screen.
-    
-    const exists = records.some(r => r.orderNumber === order && r.type !== 'nhap_hang');
+    const exists = records.some(r => r.orderNumber === order && r.type === 'soan_hang');
     if (exists) {
       showConfirm(`Số đơn hàng "${order}" đã tồn tại trong dữ liệu. Bạn có muốn tiếp tục nhập thêm vào đơn này không?`, () => {
         setActiveOrderNumber(order);
         setOrderNumberInput(order);
-        // Find existing location for this order
         setCurrentScreen('soan_hang');
       });
       return;
@@ -1026,6 +1186,27 @@ export default function App() {
     setActiveOrderNumber(order);
     setOrderNumberInput(order);
     setCurrentScreen('soan_hang');
+  };
+
+  const handleStartXuatHang = (order: string) => {
+    if (!order || !pickerName) {
+      showAlert('Vui lòng nhập đầy đủ Số đơn hàng và Người xuất');
+      return;
+    }
+    
+    const exists = records.some(r => r.orderNumber === order && r.type === 'xuat_hang');
+    if (exists) {
+      showConfirm(`Số đơn hàng "${order}" đã tồn tại trong dữ liệu xuất. Bạn có muốn tiếp tục không?`, () => {
+        setActiveOrderNumber(order);
+        setOrderNumberInput(order);
+        setCurrentScreen('xuat_hang');
+      });
+      return;
+    }
+    
+    setActiveOrderNumber(order);
+    setOrderNumberInput(order);
+    setCurrentScreen('xuat_hang');
   };
 
   const handleStartNhapHang = () => {
@@ -1048,7 +1229,18 @@ export default function App() {
     
     setActiveOrderNumber(order);
     setOrderNumberInput(order);
-    setCurrentScreen(existingRecord?.type === 'nhap_hang' ? 'nhap_hang' : 'soan_hang');
+    if (existingRecord?.type === 'xuat_hang') {
+      setCurrentScreen('xuat_hang');
+    } else {
+      setCurrentScreen(existingRecord?.type === 'nhap_hang' ? 'nhap_hang' : 'soan_hang');
+    }
+  };
+
+  const triggerImport = (type: 'soan' | 'nhap') => {
+    setImportType(type);
+    setTimeout(() => {
+      fileInputRef.current?.click();
+    }, 100);
   };
 
   if (currentScreen === 'welcome') {
@@ -1143,6 +1335,14 @@ export default function App() {
               Bắt đầu soạn hàng
             </button>
             <button 
+              id="btn-xuat-hang"
+              onClick={() => handleStartXuatHang(orderNumberInput)}
+              disabled={!orderNumberInput || !pickerName}
+              className="w-full py-3.5 bg-purple-600 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors shadow-sm"
+            >
+              Bắt đầu xuất hàng
+            </button>
+            <button 
               id="btn-nhap-hang"
               onClick={handleStartNhapHang}
               disabled={!pickerName}
@@ -1155,7 +1355,7 @@ export default function App() {
               onClick={toggleFullScreen}
               className="w-full py-3.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm"
             >
-              <Maximize size={20} className="text-purple-600" />
+              <Maximize size={20} className="text-gray-600" />
               Toàn màn hình
             </button>
 
@@ -1166,13 +1366,6 @@ export default function App() {
               accept=".csv" 
               className="hidden" 
             />
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full py-3.5 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 transition-colors shadow-sm"
-            >
-              <Upload size={20} className="text-green-600" />
-              Tải lên File CSV (Import)
-            </button>
           </div>
 
           {/* Orders List */}
@@ -1240,9 +1433,9 @@ export default function App() {
         }}
       />
       {/* Header */}
-      <header className={`text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center ${currentScreen === 'nhap_hang' ? 'bg-amber-500/90' : 'bg-blue-600/90'} backdrop-blur-md`}>
+      <header className={`text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center ${currentScreen === 'nhap_hang' ? 'bg-amber-500/90' : currentScreen === 'xuat_hang' ? 'bg-purple-600/90' : 'bg-blue-600/90'} backdrop-blur-md`}>
         <h1 className="text-xl font-bold flex items-center gap-2">
-          <ShoppingCart /> {currentScreen === 'nhap_hang' ? 'NHẬP HÀNG DNP' : 'SOẠN HÀNG DNP'}
+          <ShoppingCart /> {currentScreen === 'nhap_hang' ? 'NHẬP HÀNG DNP' : currentScreen === 'xuat_hang' ? 'XUẤT HÀNG DNP' : 'SOẠN HÀNG DNP'}
         </h1>
         <div className="flex gap-2">
           <button 
@@ -1295,6 +1488,57 @@ export default function App() {
       </header>
 
       <main className="p-4 max-w-md mx-auto space-y-6">
+        {/* Xuất hàng specific fields */}
+        {currentScreen === 'xuat_hang' && (
+          <div className="bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border border-purple-200 space-y-4">
+            <h3 className="font-bold text-purple-700 flex items-center gap-2 border-b border-purple-100 pb-2">
+              <FileText size={18} /> Thông tin vận chuyển
+            </h3>
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Số PXK</label>
+                <input 
+                  type="text" 
+                  value={pxkNumber}
+                  onChange={(e) => setPxkNumber(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Nhập số PXK..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Khách hàng</label>
+                <input 
+                  type="text" 
+                  value={customerName}
+                  onChange={(e) => setCustomerName(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Tên khách hàng..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Địa chỉ giao hàng</label>
+                <input 
+                  type="text" 
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Địa chỉ..."
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Số xe vận chuyển</label>
+                <input 
+                  type="text" 
+                  value={vehicleNumber}
+                  onChange={(e) => setVehicleNumber(e.target.value)}
+                  className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                  placeholder="Nhập số xe..."
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Input Form */}
         <div className={`bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border ${editingId ? 'border-blue-300 ring-2 ring-blue-50' : 'border-white/20'} space-y-4 transition-all`}>
           {editingId && (
@@ -1311,6 +1555,15 @@ export default function App() {
           <div className="space-y-3">
             {currentScreen === 'nhap_hang' ? (
               <>
+                <div className="pb-2">
+                  <button 
+                    onClick={() => triggerImport('nhap')}
+                    className="w-full py-2.5 bg-white border border-gray-200 text-amber-600 text-[11px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-amber-50 transition-colors shadow-sm"
+                  >
+                    <Upload size={16} />
+                    Tải đơn nhập (.csv)
+                  </button>
+                </div>
                 <div className="pb-2">
                   <button
                     onClick={() => setScanningField('productQR')}
@@ -1411,12 +1664,21 @@ export default function App() {
             ) : (
               <>
                 <div className="pb-2">
+                  <button 
+                    onClick={() => triggerImport('soan')}
+                    className={`w-full py-2.5 bg-white border border-gray-200 ${currentScreen === 'xuat_hang' ? 'text-purple-600 hover:bg-purple-50' : 'text-blue-600 hover:bg-blue-50'} text-[11px] font-bold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm`}
+                  >
+                    <Upload size={16} />
+                    Tải đơn soạn (.csv)
+                  </button>
+                </div>
+                <div className="pb-2">
                   <button
                     id="btn-scan-product"
                     onClick={() => setScanningField('productQR')}
-                    className="w-full py-3 bg-blue-100 text-blue-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-200 transition-colors border border-blue-200"
+                    className={`w-full py-3 ${currentScreen === 'xuat_hang' ? 'bg-purple-100 text-purple-700 border-purple-200 hover:bg-purple-200' : 'bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200'} font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors border`}
                   >
-                    <QrCode size={20} /> Quét QR sản phẩm cần soạn
+                    <QrCode size={20} /> {currentScreen === 'xuat_hang' ? 'Quét QR sản phẩm cần xuất' : 'Quét QR sản phẩm cần soạn'}
                   </button>
                 </div>
 
@@ -1660,6 +1922,26 @@ export default function App() {
                     <span className="font-medium text-gray-900">{currentRecord?.khachHang}</span>
                   </div>
                 )}
+                {currentScreen === 'xuat_hang' && (
+                  <>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">Số PXK:</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.pxkNumber || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">Khách hàng:</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.customerName || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">Địa chỉ:</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.deliveryAddress || '-'}</span>
+                    </div>
+                    <div className="flex justify-between border-b border-black/5 pb-2">
+                      <span className="text-gray-500">Số xe:</span>
+                      <span className="font-medium text-gray-900">{currentRecord?.vehicleNumber || '-'}</span>
+                    </div>
+                  </>
+                )}
                 <div className="flex justify-between border-b border-black/5 pb-2">
                   <span className="text-gray-500">Tên hàng:</span>
                   <span className="font-medium text-gray-900">{currentRecord?.productName || '-'}</span>
@@ -1777,10 +2059,11 @@ export default function App() {
             onClick={handleDownload}
             disabled={currentOrderRecords.length === 0}
             className={`w-full py-3.5 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm ${
-              currentScreen === 'nhap_hang' ? 'bg-amber-500 hover:bg-amber-600' : 'bg-blue-600 hover:bg-blue-700'
+              currentScreen === 'nhap_hang' ? 'bg-amber-500 hover:bg-amber-600' : currentScreen === 'xuat_hang' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            <Download size={20} /> Ghi dữ liệu (Tải File CSV)
+            <Download size={20} /> 
+            {currentScreen === 'nhap_hang' ? 'Duyệt đợt nhập này' : currentScreen === 'xuat_hang' ? 'Hoàn tất và xuất dữ liệu' : 'Hoàn tất và tải file CSV'}
           </button>
         </div>
       </div>
