@@ -186,7 +186,7 @@ export default function App() {
   const [scanningField, setScanningField] = useState<ScanField>(null);
   
   // Review & Edit states
-  const [reviewIndex, setReviewIndex] = useState(0);
+  const [currentPage, setCurrentPage] = useState(1);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [runTour, setRunTour] = useState(false);
@@ -347,15 +347,23 @@ export default function App() {
 
   const availableOrders = Array.from(new Set(records.filter(r => r.type === currentScreen).map(r => r.orderNumber))).filter(Boolean);
 
-  // Clamp review index during render to prevent out-of-bounds blank items
-  const safeReviewIndex = Math.max(0, Math.min(reviewIndex, currentOrderRecords.length - 1));
+  // Pagination logic
+  const itemsPerPage = 7;
+  const totalPages = Math.max(1, Math.ceil(currentOrderRecords.length / itemsPerPage));
+  const safeCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
 
   // Sync the state if it was out of bounds
   useEffect(() => {
-    if (reviewIndex !== safeReviewIndex) {
-      setReviewIndex(safeReviewIndex);
+    if (currentPage !== safeCurrentPage) {
+      setCurrentPage(safeCurrentPage);
     }
-  }, [reviewIndex, safeReviewIndex]);
+  }, [currentPage, safeCurrentPage]);
+
+  // Get current page items
+  const currentItems = currentOrderRecords.slice(
+    (safeCurrentPage - 1) * itemsPerPage,
+    safeCurrentPage * itemsPerPage
+  );
 
   // Auto-populate shipping info from imported records for Export screen
   useEffect(() => {
@@ -980,7 +988,7 @@ export default function App() {
           deliveryAddress
         };
         setRecords([...records, newRecord]);
-        setReviewIndex(99999); 
+        setCurrentPage(99999); 
         showToast('Đã thêm bản ghi mới!');
       }
       resetForm();
@@ -1108,7 +1116,7 @@ export default function App() {
       setTaiTrongXe('');
       
       // Reset review index to make the UI change obvious
-      setReviewIndex(0);
+      setCurrentPage(1);
       
       showToast('Đã xóa bản ghi thành công!');
     });
@@ -1779,15 +1787,6 @@ export default function App() {
                     disabled={true}
                   />
 
-                  {slThucXuat && (
-                    <div className="p-3 rounded-xl border flex justify-between items-center bg-blue-50 border-blue-100">
-                      <span className="text-sm font-medium text-blue-700">
-                        Số lượng cần soạn (theo đơn):
-                      </span>
-                      <span className="text-lg font-bold text-blue-800">{slThucXuat}</span>
-                    </div>
-                  )}
-
                   <ScanInput 
                     id="location-input"
                     label="Vị trí thực tế (VD: A-001-01 hoặc AA-001-01)" 
@@ -1944,12 +1943,12 @@ export default function App() {
           </div>
         )}
 
-        {/* Records Review Carousel */}
+        {/* Records Review Table */}
         <div id="review-section" className="bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border border-white/20">
           <div className="flex justify-between items-center mb-4">
             <h2 className="font-semibold text-gray-800 flex items-center gap-2">
               <FileText size={18} className="text-gray-500" /> 
-              {currentScreen === 'nhap_hang' ? 'Duyệt đợt nhập này' : 'Duyệt đơn này'} {currentOrderRecords.length > 0 ? `(${safeReviewIndex + 1}/${currentOrderRecords.length})` : '(0)'}
+              {currentScreen === 'nhap_hang' ? 'Duyệt đợt nhập này' : 'Duyệt đơn này'}
             </h2>
             {currentOrderRecords.length > 0 && (
               <button 
@@ -1961,23 +1960,7 @@ export default function App() {
                       return updated;
                     });
                     handleCancelEdit();
-                    setLocation('');
-                    setProductLocation('');
-                    setProductName('');
-                    setQuantity('');
-                    setNote('');
-                    setMaBravo('');
-                    setKhachHang('');
-                    setDvt('');
-                    setSlThucXuat('');
-                    setQuiCach('');
-                    setSlBaoCay('');
-                    setSlLe('');
-                    setThongTinMaHang('');
-                    setNhanVienQuanHang('');
-                    setTrongLuong('');
-                    setTaiTrongXe('');
-                    setReviewIndex(0);
+                    setCurrentPage(1);
                     showToast(`Đã xóa toàn bộ ${currentScreen === 'nhap_hang' ? 'đợt nhập' : 'đơn hàng'}!`);
                   });
                 }}
@@ -1993,181 +1976,74 @@ export default function App() {
               {currentScreen === 'nhap_hang' ? 'Đợt nhập này chưa có dữ liệu.' : 'Đơn hàng này chưa có dữ liệu.'}<br/>Hãy quét mã và thêm vào danh sách.
             </div>
           ) : (
-            <div className="space-y-4">
-              {/* Current Record Card */}
-              <div className={`p-4 border rounded-xl space-y-2 text-sm transition-colors h-[450px] overflow-y-auto ${
-                editingId === currentRecord?.id 
-                  ? 'border-blue-200 bg-blue-50/50' 
-                  : 'border-blue-100 bg-blue-50/30'
-              }`}>
-                <div className="flex justify-between border-b border-black/5 pb-2">
-                  <span className="text-gray-500">
-                    {currentScreen === 'nhap_hang' ? 'Người nhập:' : currentScreen === 'xuat_hang' ? 'Người xuất hàng:' : 'Người soạn:'}
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left">
+                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
+                  <tr>
+                    <th className="px-2 py-3 w-10 text-center">STT</th>
+                    <th className="px-2 py-3">Tên hàng</th>
+                    <th className="px-2 py-3 text-center">Trạng thái</th>
+                    <th className="px-2 py-3 text-right">Sửa</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {currentItems.map((record, index) => {
+                    const isPicked = (record.multiLocations && record.multiLocations.length > 0) || (record.location && record.quantity);
+                    const stt = (currentPage - 1) * itemsPerPage + index + 1;
+                    return (
+                      <tr key={record.id} className="bg-white border-b hover:bg-gray-50">
+                        <td className="px-2 py-3 text-center text-gray-500">{stt}</td>
+                        <td className="px-2 py-3 font-medium text-gray-900">{record.productName}</td>
+                        <td className="px-2 py-3 text-center">
+                          {isPicked ? (
+                            <div className="flex justify-center">
+                              <Check size={18} className="text-green-600" />
+                            </div>
+                          ) : (
+                            <span className="text-gray-400">-</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-3 text-right">
+                          <button 
+                            onClick={() => handleEdit(record)}
+                            className="text-blue-600 hover:text-blue-800 p-1"
+                          >
+                            <Edit size={16} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+              
+              {/* Pagination Controls */}
+              {totalPages > 1 && (
+                <div className="flex items-center justify-between mt-4 px-2">
+                  <button 
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="p-2 rounded-lg bg-gray-100 text-gray-700 disabled:opacity-40 hover:bg-gray-200 transition-colors"
+                  >
+                    <ChevronLeft size={20} />
+                  </button>
+                  <span className="text-sm text-gray-600 font-medium">
+                    Trang {currentPage} / {totalPages}
                   </span>
-                  <span className="font-medium text-gray-900">{currentRecord?.pickerName || '-'}</span>
-                </div>
-                {currentScreen !== 'nhap_hang' && (
-                  <div className="flex justify-between border-b border-black/5 pb-2">
-                    <span className="text-gray-500">Đơn hàng:</span>
-                    <span className="font-medium text-gray-900">{currentRecord?.orderNumber || '-'}</span>
-                  </div>
-                )}
-                {currentScreen !== 'nhap_hang' && (
-                  <div className="flex justify-between border-b border-black/5 pb-2">
-                    <span className="text-gray-500">Vị trí mã hàng:</span>
-                    <span className="font-medium text-gray-900">{currentRecord?.productLocation || '-'}</span>
-                  </div>
-                )}
-                {currentRecord?.transferToLocation && (
-                  <div className="flex justify-between border-b border-black/5 pb-2">
-                    <span className="text-gray-500">Vị trí chuyển đến:</span>
-                    <span className="font-medium text-blue-600">{currentRecord.transferToLocation}</span>
-                  </div>
-                )}
-                <div className="flex justify-between border-b border-black/5 pb-2">
-                  <span className="text-gray-500">Mã Bravo:</span>
-                  <span className="font-medium text-gray-900">{currentRecord?.maBravo || '-'}</span>
-                </div>
-                {currentScreen !== 'xuat_hang' && currentRecord?.khachHang && (
-                  <div className="flex justify-between border-b border-black/5 pb-2">
-                    <span className="text-gray-500">Khách hàng:</span>
-                    <span className="font-medium text-gray-900">{currentRecord?.khachHang}</span>
-                  </div>
-                )}
-                {currentScreen === 'xuat_hang' && (
-                  <>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-gray-500">Số PXK:</span>
-                      <span className="font-medium text-gray-900">{currentRecord?.pxkNumber || '-'}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-gray-500">Khách hàng:</span>
-                      <span className="font-medium text-gray-900">{currentRecord?.customerName || currentRecord?.khachHang || '-'}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-gray-500">Địa chỉ:</span>
-                      <span className="font-medium text-gray-900">{currentRecord?.deliveryAddress || '-'}</span>
-                    </div>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-gray-500">Số xe:</span>
-                      <span className="font-medium text-gray-900">{currentRecord?.vehicleNumber || '-'}</span>
-                    </div>
-                  </>
-                )}
-                <div className="flex justify-between border-b border-black/5 pb-2">
-                  <span className="text-gray-500">Tên hàng:</span>
-                  <span className="font-medium text-gray-900">{currentRecord?.productName || '-'}</span>
-                </div>
-                {currentScreen !== 'nhap_hang' && (
-                  <>
-                    <div className={`flex justify-between border-b border-black/5 p-2 items-center rounded-lg mb-1 ${
-                      currentRecord?.slThucXuat !== currentRecord?.originalSlThucXuat ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
-                    }`}>
-                      <span className="font-medium">SL Thực Xuất (cái):</span>
-                      <span className="font-bold text-lg">
-                        {currentRecord?.slThucXuat || '-'} {currentRecord?.slThucXuat ? currentRecord?.dvt : ''}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-gray-500">Qui cách (Bao/Cây):</span>
-                      <span className="font-medium text-gray-900">{currentRecord?.quiCach || '-'}</span>
-                    </div>
-                    <div className={`flex justify-between border-b border-black/5 p-2 items-center rounded-lg mb-1 ${
-                      currentRecord?.slBaoCay !== currentRecord?.originalSlBaoCay ? 'bg-red-600 text-white' : 'bg-blue-600 text-white'
-                    }`}>
-                      <span className="font-medium">SL (Bao/Cây):</span>
-                      <span className="font-bold text-lg">
-                        {currentRecord?.slBaoCay || '-'}
-                      </span>
-                    </div>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-gray-500">SL Lẻ:</span>
-                      <span className={`font-medium ${getQuantityColor(currentRecord?.slLe || '', currentRecord?.originalSlLe || '')}`}>
-                        {currentRecord?.slLe || '-'}
-                      </span>
-                    </div>
-                  </>
-                )}
-                {/* Multi-location display in Review */}
-                {currentRecord?.multiLocations && currentRecord.multiLocations.length > 0 ? (
-                  <div className="border-b border-black/5 pb-2">
-                    <span className="text-gray-500 block mb-1">Vị trí & Số lượng thực tế:</span>
-                    <div className="space-y-1">
-                      {currentRecord.multiLocations.map((pair, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white/50 px-2 py-1 rounded border border-black/5">
-                          <span className="font-medium text-gray-700">{pair.location}</span>
-                          <span className={`font-bold ${currentScreen === 'nhap_hang' ? 'text-amber-700' : 'text-blue-600'}`}>
-                            {pair.quantity}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex justify-between border-b border-black/5 pb-2">
-                      <span className="text-gray-500">Vị trí thực tế:</span>
-                      <span className="font-medium text-gray-900">{currentRecord?.location || '-'}</span>
-                    </div>
-                    <div className={`flex justify-between pt-1 items-center ${currentScreen === 'nhap_hang' && currentRecord?.note ? 'border-b border-black/5 pb-2' : ''}`}>
-                      <span className="text-gray-500">Số lượng:</span>
-                      <span className={`font-bold text-base px-2 py-0.5 rounded-md ${currentScreen === 'nhap_hang' ? 'text-amber-700 bg-amber-100' : 'text-blue-600 bg-blue-100'}`}>{currentRecord?.quantity || '-'}</span>
-                    </div>
-                  </>
-                )}
-                {currentScreen === 'nhap_hang' && currentRecord?.note && (
-                  <div className="flex justify-between pt-1 items-center">
-                    <span className="text-gray-500">Ghi chú:</span>
-                    <span className="font-medium text-gray-900">{currentRecord?.note}</span>
-                  </div>
-                )}
-              </div>
-
-              {/* Navigation & Actions */}
-              <div className="flex items-center justify-between gap-2">
-                <button 
-                  onClick={() => setReviewIndex(safeReviewIndex - 1)}
-                  disabled={safeReviewIndex === 0}
-                  className="p-2.5 rounded-xl bg-gray-100 text-gray-700 disabled:opacity-40 hover:bg-gray-200 transition-colors"
-                >
-                  <ChevronLeft size={24} />
-                </button>
-                
-                <div className="flex gap-2 flex-1 justify-center">
                   <button 
-                    onClick={() => handleEdit(currentRecord)} 
-                    className={`px-4 py-2 rounded-xl font-medium flex items-center gap-2 transition-colors ${
-                      editingId === currentRecord?.id 
-                        ? 'bg-blue-100 text-blue-700' 
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                    }`}
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages}
+                    className="p-2 rounded-lg bg-gray-100 text-gray-700 disabled:opacity-40 hover:bg-gray-200 transition-colors"
                   >
-                    <Edit size={18} /> Sửa
-                  </button>
-                  <button 
-                    onClick={() => {
-                      if (currentRecord) {
-                        handleDeleteRecord(currentRecord.id);
-                      }
-                    }} 
-                    className="px-4 py-2 bg-red-50 text-red-600 hover:bg-red-100 rounded-xl font-medium flex items-center gap-2 transition-colors"
-                  >
-                    <Trash2 size={18} /> Xóa
+                    <ChevronRight size={20} />
                   </button>
                 </div>
-
-                <button 
-                  onClick={() => setReviewIndex(safeReviewIndex + 1)}
-                  disabled={safeReviewIndex === currentOrderRecords.length - 1}
-                  className="p-2.5 rounded-xl bg-gray-100 text-gray-700 disabled:opacity-40 hover:bg-gray-200 transition-colors"
-                >
-                  <ChevronRight size={24} />
-                </button>
-              </div>
+              )}
             </div>
           )}
         </div>
       </main>
+
 
       {/* Fixed Bottom Action */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
