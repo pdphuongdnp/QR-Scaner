@@ -2021,9 +2021,8 @@ export default function App() {
               {totalPages > 1 && (
                 <div className="flex items-center justify-between mt-4 px-2">
                   <button 
-                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-                    disabled={currentPage === 1}
-                    className="p-2 rounded-lg bg-gray-100 text-gray-700 disabled:opacity-40 hover:bg-gray-200 transition-colors"
+                    onClick={() => setCurrentPage(p => p === 1 ? totalPages : p - 1)}
+                    className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                   >
                     <ChevronLeft size={20} />
                   </button>
@@ -2031,9 +2030,8 @@ export default function App() {
                     Trang {currentPage} / {totalPages}
                   </span>
                   <button 
-                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-                    disabled={currentPage === totalPages}
-                    className="p-2 rounded-lg bg-gray-100 text-gray-700 disabled:opacity-40 hover:bg-gray-200 transition-colors"
+                    onClick={() => setCurrentPage(p => p === totalPages ? 1 : p + 1)}
+                    className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
                   >
                     <ChevronRight size={20} />
                   </button>
