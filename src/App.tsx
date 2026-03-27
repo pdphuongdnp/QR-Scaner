@@ -2,7 +2,7 @@ import { jsPDF } from 'jspdf';
 import 'jspdf-autotable';
 import { useState, useEffect, useRef } from 'react';
 import { format, parse } from 'date-fns';
-import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers, Upload, Check } from 'lucide-react';
+import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers, Upload, Check, Package } from 'lucide-react';
 import { Scanner } from './components/Scanner';
 import { GuideModal } from './components/GuideModal';
 import { downloadUserGuideDocx } from './utils/generateDocx';
@@ -1417,8 +1417,6 @@ export default function App() {
     );
   }
 
-  const currentRecord = currentOrderRecords[safeReviewIndex];
-
   return (
     <div className="min-h-screen pb-24">
       <Joyride
@@ -1498,8 +1496,63 @@ export default function App() {
       </header>
 
       <main className="p-4 max-w-md mx-auto space-y-6">
-        {/* Input Form */}
+        {/* General Order Info Section */}
+        <div className={`bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border ${currentScreen === 'nhap_hang' ? 'border-amber-200' : currentScreen === 'xuat_hang' ? 'border-purple-200' : 'border-blue-200'} space-y-3 transition-all`}>
+          <div className="flex justify-between items-center mb-2">
+            <h2 className={`font-semibold flex items-center gap-2 ${currentScreen === 'nhap_hang' ? 'text-amber-700' : currentScreen === 'xuat_hang' ? 'text-purple-700' : 'text-blue-700'}`}>
+              <FileText size={18} /> 
+              Thông tin chung
+            </h2>
+          </div>
+          
+          <ScanInput 
+            label={currentScreen === 'nhap_hang' ? 'Người nhập' : currentScreen === 'xuat_hang' ? 'Người xuất' : 'Người soạn'} 
+            value={pickerName} 
+            onChange={setPickerName} 
+            onScanClick={() => {}} 
+            placeholder="Tên người thao tác"
+            disabled={true}
+          />
+          
+          <ScanInput 
+            label={currentScreen === 'nhap_hang' ? 'Số đợt nhập' : 'Số đơn hàng'} 
+            value={activeOrderNumber} 
+            onChange={setActiveOrderNumber} 
+            onScanClick={() => setScanningField('welcomeOrderQR')} 
+            placeholder="Số đơn hàng"
+            disabled={false}
+          />
+
+          {currentScreen === 'xuat_hang' && (
+            <>
+              <ScanInput label="Số PXK" value={pxkNumber} onChange={setPxkNumber} onScanClick={() => setScanningField('pxkNumber')} placeholder="Số PXK (từ đơn)..." disabled={false} />
+              <ScanInput label="Khách hàng" value={customerName} onChange={setCustomerName} onScanClick={() => {}} placeholder="Tên khách hàng (từ đơn)..." disabled={false} />
+              <ScanInput label="Địa chỉ giao hàng" value={deliveryAddress} onChange={setDeliveryAddress} onScanClick={() => {}} placeholder="Địa chỉ (từ đơn)..." disabled={false} />
+              
+              <div className="flex items-end gap-2">
+                <div className="flex-1">
+                  <ScanInput label="Số xe vận chuyển" value={vehicleNumber} onChange={setVehicleNumber} onScanClick={() => setScanningField('vehicleNumber')} placeholder="Nhập hoặc quét số xe..." disabled={false} />
+                </div>
+                <button 
+                  onClick={updateShippingInfoForAll}
+                  className="p-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors flex items-center justify-center h-[46px] mb-[1px]"
+                  title="Cập nhật thông tin giao hàng cho toàn bộ đơn"
+                >
+                  <Save size={20} />
+                </button>
+              </div>
+            </>
+          )}
+        </div>
+
+        {/* Product Input Form */}
         <div className={`bg-white/90 backdrop-blur-md p-5 rounded-2xl shadow-xl border ${editingId ? 'border-blue-300 ring-2 ring-blue-50' : currentScreen === 'xuat_hang' ? 'border-purple-200' : 'border-white/20'} space-y-4 transition-all`}>
+          {!editingId && (
+            <h2 className={`font-semibold flex items-center gap-2 mb-2 ${currentScreen === 'nhap_hang' ? 'text-amber-700' : currentScreen === 'xuat_hang' ? 'text-purple-700' : 'text-blue-700'}`}>
+              <Package size={18} /> 
+              {currentScreen === 'nhap_hang' ? 'Chi tiết nhập hàng' : currentScreen === 'xuat_hang' ? 'Chi tiết xuất hàng' : 'Chi tiết soạn hàng'}
+            </h2>
+          )}
           {editingId && (
             <div className="flex justify-between items-center mb-2">
               <h2 className="font-semibold text-blue-700">
@@ -1514,42 +1567,25 @@ export default function App() {
           <div className="space-y-3">
             {currentScreen === 'xuat_hang' && (
               <>
-                <div className="grid grid-cols-2 gap-3 mb-2">
+                <div className="pb-2">
                   <button 
                     onClick={() => triggerImport('xuat')}
-                    className="w-full py-3 bg-white border border-purple-200 text-purple-600 text-sm font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-purple-50 transition-colors shadow-lg"
+                    className="w-full py-2.5 bg-white border border-purple-200 text-purple-600 text-sm font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-purple-50 transition-colors shadow-sm"
                   >
-                    <Upload size={20} /> Tải đơn xuất
+                    <Upload size={18} />
+                    Tải đơn xuất (.csv)
                   </button>
+                </div>
+                <div className="pb-2">
                   <button
                     onClick={() => setScanningField('productQR')}
-                    className="w-full py-3 bg-purple-600 text-white font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-purple-700 transition-colors shadow-lg border border-purple-500"
+                    className="w-full py-3 bg-purple-100 text-purple-700 font-semibold rounded-2xl flex items-center justify-center gap-2 hover:bg-purple-200 transition-colors border border-purple-200"
                   >
-                    <QrCode size={20} /> Quét mã
+                    <QrCode size={20} /> Quét mã sản phẩm
                   </button>
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
-                  <ScanInput label="Số PXK" value={pxkNumber} onChange={setPxkNumber} onScanClick={() => setScanningField('pxkNumber')} placeholder="Số PXK (từ đơn)..." disabled={false} />
-                  <ScanInput label="Khách hàng" value={customerName} onChange={setCustomerName} onScanClick={() => {}} placeholder="Tên khách hàng (từ đơn)..." disabled={false} />
-                  <ScanInput label="Địa chỉ giao hàng" value={deliveryAddress} onChange={setDeliveryAddress} onScanClick={() => {}} placeholder="Địa chỉ (từ đơn)..." disabled={false} />
-                  
-                  <div className="flex items-end gap-2">
-                    <div className="flex-1">
-                      <ScanInput label="Số xe vận chuyển" value={vehicleNumber} onChange={setVehicleNumber} onScanClick={() => setScanningField('vehicleNumber')} placeholder="Nhập hoặc quét số xe..." disabled={false} />
-                    </div>
-                    <button 
-                      onClick={updateShippingInfoForAll}
-                      className="p-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors flex items-center justify-center h-[46px] mb-[1px]"
-                      title="Cập nhật thông tin giao hàng cho toàn bộ đơn"
-                    >
-                      <Save size={20} />
-                    </button>
-                  </div>
-
-                  <ScanInput label="Người xuất hàng" value={pickerName} onChange={setPickerName} onScanClick={() => {}} placeholder="Tên người xuất" disabled={true} />
-                  <ScanInput label="Số đơn hàng" value={activeOrderNumber} onChange={setActiveOrderNumber} onScanClick={() => setScanningField('welcomeOrderQR')} placeholder="Số đơn hàng" disabled={false} />
-                  
                   <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
                     <ScanInput label="Tên sản phẩm" value={productName} onChange={() => {}} onScanClick={() => {}} placeholder="Tên sản phẩm" disabled={true} />
                     
@@ -1614,39 +1650,21 @@ export default function App() {
                 <div className="pb-2">
                   <button 
                     onClick={() => triggerImport('nhap')}
-                    className="w-full py-2.5 bg-white border border-gray-200 text-amber-600 text-[11px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-amber-50 transition-colors shadow-sm"
+                    className="w-full py-2.5 bg-white border border-amber-200 text-amber-600 text-sm font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-amber-50 transition-colors shadow-sm"
                   >
-                    <Upload size={16} />
+                    <Upload size={18} />
                     Tải đơn nhập (.csv)
                   </button>
                 </div>
                 <div className="pb-2">
                   <button
                     onClick={() => setScanningField('productQR')}
-                    className="w-full py-3 bg-amber-100 text-amber-700 font-semibold rounded-xl flex items-center justify-center gap-2 hover:bg-amber-200 transition-colors border border-amber-200"
+                    className="w-full py-3 bg-amber-100 text-amber-700 font-semibold rounded-2xl flex items-center justify-center gap-2 hover:bg-amber-200 transition-colors border border-amber-200"
                   >
                     <QrCode size={20} /> Quét QR sản phẩm (nếu có)
                   </button>
                 </div>
 
-                <ScanInput 
-                  label="Người nhập" 
-                  value={pickerName} 
-                  onChange={setPickerName} 
-                  onScanClick={() => {}} 
-                  placeholder="Tên người nhập"
-                  disabled={true}
-                />
-
-                <ScanInput 
-                  label="Số đợt nhập" 
-                  value={activeOrderNumber} 
-                  onChange={setActiveOrderNumber} 
-                  onScanClick={() => setScanningField('welcomeOrderQR')} 
-                  placeholder="Số đợt nhập"
-                  disabled={false}
-                />
-                
                 <div id="product-name-input">
                   <label className="block text-sm font-medium text-gray-700 mb-1">Tên hàng</label>
                   <input 
@@ -1732,9 +1750,9 @@ export default function App() {
                 <div className="pb-2">
                   <button 
                     onClick={() => triggerImport('soan')}
-                    className="w-full py-2.5 bg-white border border-gray-200 text-blue-600 text-[11px] font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors shadow-sm"
+                    className="w-full py-2.5 bg-white border border-blue-200 text-blue-600 text-sm font-bold rounded-2xl flex items-center justify-center gap-2 hover:bg-blue-50 transition-colors shadow-sm"
                   >
-                    <Upload size={16} />
+                    <Upload size={18} />
                     Tải đơn soạn (.csv)
                   </button>
                 </div>
@@ -1742,29 +1760,12 @@ export default function App() {
                   <button
                     id="btn-scan-product"
                     onClick={() => setScanningField('productQR')}
-                    className="w-full py-3 bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors border"
+                    className="w-full py-3 bg-blue-100 text-blue-700 border-blue-200 hover:bg-blue-200 font-semibold rounded-2xl flex items-center justify-center gap-2 transition-colors border"
                   >
                     <QrCode size={20} /> Quét QR sản phẩm cần soạn
                   </button>
                 </div>
 
-                <ScanInput 
-                  label="Người soạn" 
-                  value={pickerName} 
-                  onChange={setPickerName} 
-                  onScanClick={() => {}} 
-                  placeholder="Tên người soạn"
-                  disabled={true}
-                />
-                <ScanInput 
-                  label="Số đơn hàng" 
-                  value={activeOrderNumber} 
-                  onChange={setActiveOrderNumber} 
-                  onScanClick={() => setScanningField('welcomeOrderQR')} 
-                  placeholder="Số đơn hàng"
-                  disabled={false}
-                />
-                
                 <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Vị trí mã hàng</label>
@@ -1976,50 +1977,10 @@ export default function App() {
               {currentScreen === 'nhap_hang' ? 'Đợt nhập này chưa có dữ liệu.' : 'Đơn hàng này chưa có dữ liệu.'}<br/>Hãy quét mã và thêm vào danh sách.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="text-xs text-gray-700 uppercase bg-gray-50">
-                  <tr>
-                    <th className="px-2 py-3 w-10 text-center">STT</th>
-                    <th className="px-2 py-3">Tên hàng</th>
-                    <th className="px-2 py-3 text-center">Trạng thái</th>
-                    <th className="px-2 py-3 text-right">Sửa</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {currentItems.map((record, index) => {
-                    const isPicked = (record.multiLocations && record.multiLocations.length > 0) || (record.location && record.quantity);
-                    const stt = (currentPage - 1) * itemsPerPage + index + 1;
-                    return (
-                      <tr key={record.id} className="bg-white border-b hover:bg-gray-50">
-                        <td className="px-2 py-3 text-center text-gray-500">{stt}</td>
-                        <td className="px-2 py-3 font-medium text-gray-900">{record.productName}</td>
-                        <td className="px-2 py-3 text-center">
-                          {isPicked ? (
-                            <div className="flex justify-center">
-                              <Check size={18} className="text-green-600" />
-                            </div>
-                          ) : (
-                            <span className="text-gray-400">-</span>
-                          )}
-                        </td>
-                        <td className="px-2 py-3 text-right">
-                          <button 
-                            onClick={() => handleEdit(record)}
-                            className="text-blue-600 hover:text-blue-800 p-1"
-                          >
-                            <Edit size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-              
+            <div>
               {/* Pagination Controls */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-4 px-2">
+                <div className="flex items-center justify-between mb-4 px-2 pb-2 border-b border-gray-100">
                   <button 
                     onClick={() => setCurrentPage(p => p === 1 ? totalPages : p - 1)}
                     className="p-2 rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
@@ -2037,6 +1998,52 @@ export default function App() {
                   </button>
                 </div>
               )}
+              
+              <div className="overflow-x-auto overflow-y-auto" style={{ height: '420px' }}>
+                <table className="w-full text-sm text-left relative">
+                  <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-10 shadow-sm">
+                    <tr>
+                      <th className="px-2 py-3 w-10 text-center">STT</th>
+                      <th className="px-2 py-3">Tên hàng</th>
+                      <th className="px-2 py-3 text-center">Trạng thái</th>
+                      <th className="px-2 py-3 text-right">Sửa</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {currentItems.map((record, index) => {
+                      const isPicked = (record.multiLocations && record.multiLocations.length > 0) || (record.location && record.quantity);
+                      const stt = (currentPage - 1) * itemsPerPage + index + 1;
+                      return (
+                        <tr key={record.id} className="bg-white border-b hover:bg-gray-50 h-[52px]">
+                          <td className="px-2 py-3 text-center text-gray-500">{stt}</td>
+                          <td className="px-2 py-3 font-medium text-gray-900">
+                            <div className="line-clamp-2" title={record.productName}>
+                              {record.productName}
+                            </div>
+                          </td>
+                          <td className="px-2 py-3 text-center">
+                            {isPicked ? (
+                              <div className="flex justify-center">
+                                <Check size={18} className="text-green-600" />
+                              </div>
+                            ) : (
+                              <span className="text-gray-400">-</span>
+                            )}
+                          </td>
+                          <td className="px-2 py-3 text-right">
+                            <button 
+                              onClick={() => handleEdit(record)}
+                              className="text-blue-600 hover:text-blue-800 p-1 inline-flex justify-center items-center"
+                            >
+                              <Edit size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
           )}
         </div>
