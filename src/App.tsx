@@ -639,8 +639,8 @@ export default function App() {
             const orderNumber = getValue(['Đơn hàng', 'Order Number', 'Số đơn hàng']) || 
                                (importType === 'nhap' ? `NHAP_${format(new Date(), 'ddMMMyy_HHmmss')}` : '');
 
-            const slThucXuatVal = getValue(['SL Thực Xuất (cái)', 'SL Thực Xuất(cái)', 'SL Thực Xuất']) || '';
-            const slBaoCayVal = getValue(['SL (Bao/Cây)', 'SL(Bao/Cây)', 'Số lượng bao/cây']) || '';
+            const slThucXuatVal = getValue(['SL Thực Xuất (cái)', 'SL Thực Xuất(cái)', 'SL Thực Xuất', 'Số lượng cái']) || '';
+            const slBaoCayVal = getValue(['SL (Bao/Cây)', 'SL(Bao/Cây)', 'Số lượng bao/cây', 'Số lượng bao']) || '';
             const slLeVal = getValue(['SL Lẻ', 'Số lượng lẻ']) || '';
 
             return {
@@ -648,12 +648,12 @@ export default function App() {
               type,
               orderNumber,
               pickerName: getValue(['Người soạn/nhập', 'Người soạn', 'Người nhập', 'Picker Name']) || pickerName || 'Admin',
-              location: getValue(['Vị trí thực tế', 'Vị trí', 'Location']) || '',
+              location: getValue(['Vị trí thực tế', 'Vị trí nhập thực tế', 'Vị trí', 'Location']) || '',
               productLocation: infoMaHang || '',
               thongTinMaHang: infoMaHang || '',
               productName: getValue(['Tên sản phẩm', 'Tên hàng', 'Product Name']) || '',
-              quantity: getValue(['Số lượng thực tế', 'Số lượng', 'Quantity']) || '',
-              note: getValue(['Ghi chú', 'Ghi chú nhập', 'Note']) || '',
+              quantity: getValue(['Số lượng thực tế', 'Số lượng tại vị trí', 'Số lượng', 'Quantity']) || '',
+              note: getValue(['Ghi chú', 'Ghi chú nhập', 'Note', 'Ghi chú khi nhập hàng']) || '',
               transferToLocation: getValue(['Vị trí chuyển đến', 'Transfer To']) || '',
               createdAt,
               maBravo: getValue(['Mã Bravo', 'Mã hàng', 'Mã sản phẩm', 'Code']) || '',
@@ -662,7 +662,7 @@ export default function App() {
               dvt: getValue(['ĐVT', 'Unit']) || '',
               slThucXuat: slThucXuatVal,
               originalSlThucXuat: slThucXuatVal,
-              quiCach: getValue(['Qui cách (Bao/Cây)', 'Qui cách(Bao/Cây)', 'Qui cách']) || '',
+              quiCach: getValue(['Qui cách (Bao/Cây)', 'Qui cách(Bao/Cây)', 'Qui cách', 'Qui cách bao']) || '',
               slBaoCay: slBaoCayVal,
               originalSlBaoCay: slBaoCayVal,
               slLe: slLeVal,
@@ -766,6 +766,7 @@ export default function App() {
     if (scanningField === 'transferToLocation') setTransferToLocation(text);
     if (scanningField === 'vehicleNumber') setVehicleNumber(text);
     if (scanningField === 'pxkNumber') setPxkNumber(text);
+    if (scanningField === 'maBravo') setMaBravo(text);
     if (scanningField === 'welcomeOrderQR') {
       if (text.includes(';')) {
         const parts = text.split(';');
@@ -1222,49 +1223,96 @@ export default function App() {
     }
     
     // Create content (comma separated)
-    const header = [
-      'STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'ĐC Nhận hàng', 
-      'Số PXK', 'Số xe VC', 'Đơn hàng', 'ĐVT', 'SL Thực Xuất(cái)', 
-      'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 'Thông tin mã hàng', 
-      'Nhân viên quản hàng', 'Trọng lượng( kg)', 'Tải trọng xe(kg)',
-      'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Số lượng thực xuất', 'Loại', 'Ghi chú', 'Ngày giờ tạo file'
-    ].map(escapeCSV).join(',');
+    let header = '';
+    if (isNhap) {
+      header = [
+        'STT', 'Ngày', 'Mã hàng', 'Tên hàng', 'Số lượng cái', 
+        'Số lượng bao', 'Qui cách bao', 'Số lượng lẻ', 
+        'Vị trí nhập thực tế', 'Số lượng tại vị trí', 'Ghi chú khi nhập hàng', 
+        'Người nhập', 'Ngày giờ tạo file'
+      ].map(escapeCSV).join(',');
+    } else {
+      header = [
+        'STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'ĐC Nhận hàng', 
+        'Số PXK', 'Số xe VC', 'Đơn hàng', 'ĐVT', 'SL Thực Xuất(cái)', 
+        'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 'Thông tin mã hàng', 
+        'Nhân viên quản hàng', 'Trọng lượng( kg)', 'Tải trọng xe(kg)',
+        'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Số lượng thực xuất', 'Loại', 'Ghi chú', 'Ngày giờ tạo file'
+      ].map(escapeCSV).join(',');
+    }
     
     let stt = 1;
     const rows = currentOrderRecords.flatMap(r => {
       // If there are multiple locations, create a row for each
       if (r.multiLocations && r.multiLocations.length > 0) {
-        return r.multiLocations.map(pair => [
+        return r.multiLocations.map(pair => {
+          if (isNhap) {
+            return [
+              stt++,
+              format(r.createdAt, 'dd/MM/yyyy'),
+              r.maBravo || '', 
+              r.productName || '', 
+              r.slThucXuat || '', 
+              r.slBaoCay || '', 
+              r.quiCach || '', 
+              r.slLe || '', 
+              pair.location || '', 
+              pair.quantity || '',
+              r.note || '',
+              r.pickerName || '', 
+              fileCreationTime
+            ];
+          }
+          return [
+            stt++,
+            format(r.createdAt, 'dd/MM/yyyy'),
+            r.maBravo || '', 
+            r.productName || '', 
+            r.khachHang || r.customerName || '',
+            r.deliveryAddress || '',
+            r.pxkNumber || '',
+            r.vehicleNumber || '',
+            r.orderNumber || '', 
+            r.dvt || '', 
+            r.slThucXuat || '', 
+            r.quiCach || '', 
+            r.slBaoCay || '', 
+            r.slLe || '', 
+            r.productLocation || r.thongTinMaHang || '', 
+            r.nhanVienQuanHang || '', 
+            r.trongLuong || '', 
+            r.taiTrongXe || '',
+            r.transferToLocation || '',
+            r.pickerName || '', 
+            pair.location || '', 
+            pair.quantity || '',
+            r.type === 'xuat_hang' ? (pair.quantity || r.slThucXuat || '') : '',
+            r.type === 'nhap_hang' ? 'Nhập hàng' : (r.type === 'xuat_hang' ? 'Xuất hàng' : 'Soạn hàng'),
+            r.note || '',
+            fileCreationTime
+          ];
+        });
+      }
+      
+      // Fallback for single location or legacy records
+      if (isNhap) {
+        return [[
           stt++,
           format(r.createdAt, 'dd/MM/yyyy'),
           r.maBravo || '', 
           r.productName || '', 
-          r.khachHang || r.customerName || '',
-          r.deliveryAddress || '',
-          r.pxkNumber || '',
-          r.vehicleNumber || '',
-          r.orderNumber || '', 
-          r.dvt || '', 
           r.slThucXuat || '', 
-          r.quiCach || '', 
           r.slBaoCay || '', 
+          r.quiCach || '', 
           r.slLe || '', 
-          r.productLocation || r.thongTinMaHang || '', 
-          r.nhanVienQuanHang || '', 
-          r.trongLuong || '', 
-          r.taiTrongXe || '',
-          r.transferToLocation || '',
-          r.pickerName || '', 
-          pair.location || '', 
-          pair.quantity || '',
-          r.type === 'xuat_hang' ? (pair.quantity || r.slThucXuat || '') : '',
-          r.type === 'nhap_hang' ? 'Nhập hàng' : (r.type === 'xuat_hang' ? 'Xuất hàng' : 'Soạn hàng'),
+          r.location || '', 
+          r.quantity || '',
           r.note || '',
+          r.pickerName || '', 
           fileCreationTime
-        ]);
+        ]];
       }
       
-      // Fallback for single location or legacy records
       return [[
         stt++,
         format(r.createdAt, 'dd/MM/yyyy'),
@@ -1665,82 +1713,147 @@ export default function App() {
                   </button>
                 </div>
 
-                <div id="product-name-input">
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Tên hàng</label>
-                  <input 
-                    type="text" 
-                    value={productName}
-                    onChange={(e) => setProductName(e.target.value)}
-                    className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
-                    placeholder="Nhập tên hàng..."
-                  />
-                </div>
-
-                <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
+                <div className="grid grid-cols-1 gap-3">
                   <ScanInput 
-                    id="location-input"
-                    label="Vị trí thực tế (VD: A-001-01 hoặc AA-001-01)" 
-                    value={location} 
-                    onChange={setLocation} 
-                    onScanClick={() => setScanningField('location')} 
-                    placeholder="Nhập hoặc quét mã..."
-                    disabled={!productName.trim() && !editingId}
+                    label="Mã hàng" 
+                    value={maBravo} 
+                    onChange={setMaBravo} 
+                    onScanClick={() => setScanningField('maBravo')} 
+                    placeholder="Nhập hoặc quét mã hàng..." 
                   />
-
-                  <div id="quantity-input">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng tại vị trí này</label>
+                  
+                  <div id="product-name-input">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Tên hàng</label>
                     <input 
-                      type="number" 
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      disabled={!productName.trim() && !editingId}
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all disabled:bg-gray-50"
-                      placeholder="Nhập số lượng..."
+                      type="text" 
+                      value={productName}
+                      onChange={(e) => setProductName(e.target.value)}
+                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all"
+                      placeholder="Nhập tên hàng..."
                     />
                   </div>
 
-                  <button 
-                    onClick={addLocationPair}
-                    disabled={!productName.trim() && !editingId}
-                    className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-dashed border-amber-300 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50"
-                  >
-                    <Plus size={18} /> Thêm vị trí & số lượng này
-                  </button>
-
-                  {multiLocations.length > 0 && (
-                    <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 space-y-2 mt-2">
-                      <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
-                      {multiLocations.map((pair, idx) => (
-                        <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-200 shadow-sm">
-                          <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-amber-600 mx-1">→</span> {pair.quantity}</span>
-                          <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
-                            <X size={16} />
-                          </button>
+                  <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
+                    <div className="grid grid-cols-1 gap-3 pt-3 mt-3 border-t border-amber-100">
+                      <div>
+                        <label className="block text-sm font-bold text-amber-700 mb-1">Số lượng cái</label>
+                        <input 
+                          type="number" 
+                          value={slThucXuat}
+                          onChange={(e) => setSlThucXuat(e.target.value)}
+                          className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-amber-500 outline-none ${
+                            slThucXuat !== originalSlThucXuat ? 'border-red-500 bg-red-50 text-red-600 font-bold' : 'border-amber-300 bg-amber-50/30'
+                          }`}
+                          placeholder="Nhập số lượng cái..."
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng bao</label>
+                          <input 
+                            type="number" 
+                            value={slBaoCay}
+                            onChange={(e) => setSlBaoCay(e.target.value)}
+                            className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-amber-500 outline-none ${
+                              slBaoCay !== originalSlBaoCay ? 'border-red-500 bg-red-50 text-red-600 font-bold' : 'border-gray-300'
+                            }`}
+                            placeholder="Số lượng bao"
+                          />
                         </div>
-                      ))}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1">Qui cách bao</label>
+                          <input 
+                            type="text" 
+                            value={quiCach}
+                            onChange={(e) => setQuiCach(e.target.value)}
+                            className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none"
+                            placeholder="Qui cách"
+                          />
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng lẻ</label>
+                        <input 
+                          type="number" 
+                          value={slLe}
+                          onChange={(e) => setSlLe(e.target.value)}
+                          className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-amber-500 outline-none ${
+                            slLe !== originalSlLe ? 'border-red-500 bg-red-50 text-red-600 font-bold' : 'border-gray-300'
+                          }`}
+                          placeholder="Số lượng lẻ"
+                        />
+                      </div>
                     </div>
-                  )}
 
-                  <ScanInput 
-                    id="transfer-to-location-input"
-                    label="Vị trí chuyển đến (Chuyển kho)" 
-                    value={transferToLocation} 
-                    onChange={setTransferToLocation} 
-                    onScanClick={() => setScanningField('transferToLocation')} 
-                    placeholder="Nhập hoặc quét mã chuyển đến..."
-                    disabled={!productName.trim() && !editingId}
-                  />
-                  
-                  <div id="note-input">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
-                    <textarea 
-                      value={note}
-                      onChange={(e) => setNote(e.target.value)}
-                      rows={3}
-                      disabled={!productName.trim() && !editingId}
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all disabled:bg-gray-50"
-                      placeholder="Nhập ghi chú..."
-                    />
+                    <div className="pt-3 mt-3 border-t border-amber-100">
+                      <ScanInput 
+                        id="location-input"
+                        label="Vị trí thực tế (VD: A-001-01 hoặc AA-001-01)" 
+                        value={location} 
+                        onChange={setLocation} 
+                        onScanClick={() => setScanningField('location')} 
+                        placeholder="Nhập hoặc quét mã..."
+                        disabled={!productName.trim() && !editingId}
+                      />
+
+                      <div id="quantity-input" className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng tại vị trí này</label>
+                        <input 
+                          type="number" 
+                          value={quantity}
+                          onChange={(e) => setQuantity(e.target.value)}
+                          disabled={!productName.trim() && !editingId}
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all disabled:bg-gray-50"
+                          placeholder="Nhập số lượng..."
+                        />
+                      </div>
+
+                      <button 
+                        onClick={addLocationPair}
+                        disabled={!productName.trim() && !editingId}
+                        className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-dashed border-amber-300 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50 mt-3"
+                      >
+                        <Plus size={18} /> Thêm vị trí & số lượng này
+                      </button>
+
+                      {multiLocations.length > 0 && (
+                        <div className="bg-amber-50/50 p-3 rounded-xl border border-amber-100 space-y-2 mt-2">
+                          <h4 className="text-xs font-bold text-amber-800 uppercase tracking-wider">Danh sách vị trí đã thêm:</h4>
+                          {multiLocations.map((pair, idx) => (
+                            <div key={idx} className="flex justify-between items-center bg-white p-2 rounded-lg border border-amber-200 shadow-sm">
+                              <span className="text-sm font-bold text-gray-700">{pair.location} <span className="text-amber-600 mx-1">→</span> {pair.quantity}</span>
+                              <button onClick={() => removeLocationPair(idx)} className="text-red-500 p-1 hover:bg-red-50 rounded-md transition-colors">
+                                <X size={16} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="mt-3">
+                        <ScanInput 
+                          id="transfer-to-location-input"
+                          label="Vị trí chuyển đến (Chuyển kho)" 
+                          value={transferToLocation} 
+                          onChange={setTransferToLocation} 
+                          onScanClick={() => setScanningField('transferToLocation')} 
+                          placeholder="Nhập hoặc quét mã chuyển đến..."
+                          disabled={!productName.trim() && !editingId}
+                        />
+                      </div>
+                      
+                      <div id="note-input" className="mt-3">
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Ghi chú</label>
+                        <textarea 
+                          value={note}
+                          onChange={(e) => setNote(e.target.value)}
+                          rows={3}
+                          disabled={!productName.trim() && !editingId}
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all disabled:bg-gray-50"
+                          placeholder="Nhập ghi chú..."
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </>
