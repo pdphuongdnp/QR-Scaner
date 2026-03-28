@@ -25,66 +25,49 @@ export const downloadUserGuideDocx = async () => {
         properties: {},
         children: [
           new Paragraph({
-            text: "HƯỚNG DẪN SỬ DỤNG ỨNG DỤNG QUẢN LÝ KHO DNP (CẬP NHẬT)",
+            text: "HƯỚNG DẪN SỬ DỤNG HỆ THỐNG QUẢN LÝ KHO DNP (CẬP NHẬT)",
             heading: HeadingLevel.HEADING_1,
             alignment: AlignmentType.CENTER,
             spacing: { after: 400 },
           }),
           new Paragraph({
             children: [
-              new TextRun("Chào mừng bạn đến với ứng dụng quản lý kho chuyên nghiệp. Tài liệu này sẽ giúp bạn làm quen với các tính năng mới nhất, giúp việc soạn hàng và nhập hàng trở nên nhanh chóng và chính xác hơn."),
+              new TextRun("Chào mừng bạn đến với hệ thống quản lý kho DNP chuyên nghiệp. Tài liệu này sẽ giúp bạn làm quen với các tính năng mới nhất, đặc biệt là quy trình Xuất Hàng và tạo Phiếu Xuất Kho PDF."),
             ],
             spacing: { after: 200 },
           }),
 
           new Paragraph({
-            text: "1. Chuẩn bị trước khi bắt đầu",
+            text: "1. Chuẩn bị và Thư mục làm việc",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           }),
           new Paragraph({
             children: [
-              new TextRun({ text: "Điện thoại: ", bold: true }),
-              new TextRun("Có camera hoạt động tốt để quét mã QR."),
+              new TextRun({ text: "Thư mục Nhập file: ", bold: true }),
+              new TextRun("Nên để file dữ liệu tại \\download\\DH_DNP\\ để dễ tìm kiếm khi bấm nút Nhập File CSV."),
+            ],
+            bullet: { level: 0 },
+          }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Thư mục Xuất file: ", bold: true }),
+              new TextRun("File PDF/CSV tải về nên được lưu trữ tại \\download\\DNP\\."),
             ],
             bullet: { level: 0 },
           }),
           new Paragraph({
             children: [
               new TextRun({ text: "Quyền truy cập: ", bold: true }),
-              new TextRun('Khi ứng dụng hỏi "Cho phép truy cập Camera", hãy chọn "Cho phép" (Allow).'),
+              new TextRun('Hãy chọn "Cho phép" (Allow) khi ứng dụng yêu cầu truy cập Camera.'),
             ],
             bullet: { level: 0 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: "Các nút điều hướng quan trọng: ", bold: true }),
-            ],
-            bullet: { level: 0 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: "Nút HOME (Màu Trắng): ", bold: true }),
-              new TextRun("Nằm ở góc trên bên trái, giúp bạn quay lại màn hình chính bất cứ lúc nào."),
-            ],
-            bullet: { level: 1 },
-          }),
-          new Paragraph({
-            children: [
-              new TextRun({ text: "Nút THOÁT (Màu Đỏ - Nhấp nháy): ", bold: true }),
-              new TextRun("Nằm ở góc trên bên phải, được thiết kế nổi bật để bạn dễ dàng thoát ứng dụng khi hoàn tất công việc."),
-            ],
-            bullet: { level: 1 },
           }),
 
           new Paragraph({
             text: "2. Màn hình chính (Chào mừng)",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
-          }),
-          new Paragraph({
-            text: "Khi mở ứng dụng, bạn sẽ thấy màn hình chào mừng.",
-            spacing: { after: 200 },
           }),
           new Paragraph({
             children: [
@@ -97,85 +80,46 @@ export const downloadUserGuideDocx = async () => {
             alignment: AlignmentType.CENTER,
             spacing: { after: 200 },
           }),
-          new Paragraph({ text: "1. Nhập tên của bạn: Nhập tên vào ô \"Người soạn / Người nhập\".", bullet: { level: 0 } }),
-          new Paragraph({ text: "2. Nhập số đơn hàng: Bạn có thể tự gõ hoặc quét mã trên phiếu.", bullet: { level: 0 } }),
-          new Paragraph({ text: "3. Nhập dữ liệu từ File (Mới): Bấm nút \"Nhập File CSV\" để làm tiếp đơn hàng cũ.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Hệ thống sẽ cảnh báo nếu file đã được nhập trước đó.", bullet: { level: 1 } }),
-          new Paragraph({ text: "Đơn hàng trùng số sẽ được tự động thêm hậu tố -1, -2 để giữ tính độc lập.", bullet: { level: 1 } }),
+          new Paragraph({ text: "1. Nhập tên: Nhập vào ô \"Người soạn / Người nhập\".", bullet: { level: 0 } }),
+          new Paragraph({ text: "2. Nhập số đơn: Gõ trực tiếp hoặc quét mã QR trên phiếu.", bullet: { level: 0 } }),
+          new Paragraph({ text: "3. Nhập dữ liệu từ File: Bấm nút \"Nhập File CSV\" để làm tiếp đơn hàng cũ.", bullet: { level: 0 } }),
           new Paragraph({ text: "4. Chọn chế độ làm việc:", bullet: { level: 0 } }),
-          new Paragraph({ text: "Bấm nút Màu Xanh Dương nếu bạn đi SOẠN HÀNG.", bullet: { level: 1 } }),
-          new Paragraph({ text: "Bấm nút Màu Vàng nếu bạn đi NHẬP HÀNG.", bullet: { level: 1 } }),
+          new Paragraph({ text: "Màu Xanh Dương: SOẠN HÀNG.", bullet: { level: 1 } }),
+          new Paragraph({ text: "Màu Vàng: NHẬP HÀNG.", bullet: { level: 1 } }),
+          new Paragraph({ text: "Màu Tím: XUẤT HÀNG DNP (Mới).", bullet: { level: 1 } }),
 
           new Paragraph({
-            text: "3. Cách Soạn Hàng (Giao diện Màu Xanh)",
+            text: "3. Quy trình Xuất Hàng DNP (Màu Tím)",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           }),
           new Paragraph({
-            text: "Đây là phần dành cho nhân viên đi lấy hàng theo đơn.",
+            text: "Đây là quy trình quan trọng nhất để tạo Phiếu Xuất Kho chuyên nghiệp.",
             spacing: { after: 200 },
           }),
-          new Paragraph({
-            children: [
-              new ImageRun({
-                data: soanHangImg,
-                transformation: { width: 500, height: 300 },
-                type: "png",
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-          }),
-          new Paragraph({ text: "Bước 1 - Quét mã sản phẩm: Bấm nút to nhất ở trên cùng để quét mã QR dán trên sản phẩm.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Bước 2 - Nhập vị trí: Nhập vị trí bạn lấy hàng (Ví dụ: A-001-01).", bullet: { level: 0 } }),
-          new Paragraph({ text: "Bước 3 - Nhập số lượng: Gõ số lượng thực tế bạn đã lấy.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Bước 4 - Thêm vào danh sách: Bấm nút \"Thêm vào danh sách\" ở dưới cùng.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Bước 1: Thông tin Số PXK, Khách hàng, Địa chỉ sẽ tự động được lấy từ file dữ liệu đã nhập.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Bước 2: Nhập hoặc quét số xe vận chuyển. Bấm nút Lưu (biểu tượng đĩa mềm) để cập nhật cho toàn bộ đơn.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Bước 3: Bấm nút \"Xuất file PDF\" để tải phiếu về máy.", bullet: { level: 0 } }),
 
           new Paragraph({
-            text: "4. Cách Nhập Hàng (Giao diện Màu Vàng)",
+            text: "4. Đặc điểm nổi bật của Phiếu PDF",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           }),
-          new Paragraph({
-            text: "Đây là phần dành cho việc đưa hàng mới vào kho hoặc chuyển vị trí.",
-            spacing: { after: 200 },
-          }),
-          new Paragraph({
-            children: [
-              new ImageRun({
-                data: nhapHangImg,
-                transformation: { width: 500, height: 300 },
-                type: "png",
-              }),
-            ],
-            alignment: AlignmentType.CENTER,
-            spacing: { after: 200 },
-          }),
-          new Paragraph({ text: "Bước 1: Nhập tên hàng hóa.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Bước 2: Quét hoặc nhập vị trí hiện tại và vị trí muốn chuyển đến (nếu có).", bullet: { level: 0 } }),
-          new Paragraph({ text: "Bước 3: Nhập số lượng và ghi chú thêm (nếu cần).", bullet: { level: 0 } }),
-          new Paragraph({ text: "Bước 4: Bấm nút \"Thêm vào danh sách\".", bullet: { level: 0 } }),
+          new Paragraph({ text: "Ngắt trang thông minh: Tự động xuống trang khi dữ liệu dài, không bị mất thông tin.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Lặp lại tiêu đề: Thông tin khách hàng luôn hiện ở đầu mỗi trang.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Làm nổi bật số liệu: Các cột Số lượng được in to (size 14.5) và in đậm.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Định dạng chuyên nghiệp: Phần sau dấu hai chấm (:) luôn được In Đậm & In Nghiêng.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Chữ ký: Luôn nằm ở cuối cùng với khoảng trống rộng rãi để ký tên.", bullet: { level: 0 } }),
 
           new Paragraph({
-            text: "5. Kiểm tra và Ghi dữ liệu",
+            text: "5. Một số lưu ý quan trọng",
             heading: HeadingLevel.HEADING_2,
             spacing: { before: 400, after: 200 },
           }),
-          new Paragraph({ text: "Sau khi quét xong nhiều món hàng, bạn có thể kiểm tra lại ở phần dưới cùng:", spacing: { after: 200 } }),
-          new Paragraph({ text: "1. Duyệt danh sách: Vuốt sang trái hoặc phải ở khung dưới cùng để xem lại các món đã quét.", bullet: { level: 0 } }),
-          new Paragraph({ text: "2. Sửa/Xóa: Nếu nhập sai, bạn có thể bấm nút \"Sửa\" hoặc \"Xóa\" ngay trên thẻ hàng đó.", bullet: { level: 0 } }),
-          new Paragraph({ text: "3. Tải file dữ liệu: Khi đã hoàn thành toàn bộ đơn hàng, hãy bấm nút \"Ghi dữ liệu (Tải File CSV)\" ở dưới cùng.", bullet: { level: 0 } }),
-          new Paragraph({ text: "File tải về có thể được dùng để \"Nhập File CSV\" lại vào ứng dụng nếu cần bổ sung thêm sau này.", bullet: { level: 1 } }),
-
-          new Paragraph({
-            text: "6. Một số lưu ý quan trọng",
-            heading: HeadingLevel.HEADING_2,
-            spacing: { before: 400, after: 200 },
-          }),
-          new Paragraph({ text: "Nút Thoát & Home: Luôn hiển thị rõ ràng ở thanh tiêu đề. Nút Thoát có hiệu ứng nhấp nháy đỏ để bạn dễ thấy nhất.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Chống trùng lặp File: Ứng dụng cảnh báo nếu bạn tải lên cùng một file nhiều lần.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Xử lý trùng đơn: Đơn hàng trùng số sẽ được tách riêng (ví dụ: Đơn 123 và Đơn 123-1), đảm bảo tính độc lập.", bullet: { level: 0 } }),
-          new Paragraph({ text: "Màu sắc: Nhớ quy tắc: Xanh = Soạn đi, Vàng = Nhập vào.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Font chữ: Sử dụng font Roboto Unicode, hiển thị tốt trên iPhone/iPad.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Màu sắc: Xanh = Soạn, Vàng = Nhập, Tím = Xuất.", bullet: { level: 0 } }),
+          new Paragraph({ text: "Nút Thoát & Home: Luôn hiển thị ở thanh tiêu đề để thao tác nhanh.", bullet: { level: 0 } }),
 
           new Paragraph({
             text: "Chúc bạn làm việc hiệu quả và an toàn!",

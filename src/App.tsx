@@ -270,7 +270,11 @@ export default function App() {
         },
         {
           target: '#order-number-input',
-          content: 'Nếu bạn đi Soạn hàng, hãy quét mã QR trên phiếu hoặc nhập số đơn hàng tại đây.',
+          content: 'Nếu bạn đi Soạn hàng hoặc Xuất hàng, hãy quét mã QR trên phiếu hoặc nhập số đơn hàng tại đây.',
+        },
+        {
+          target: '#btn-import-csv',
+          content: 'Bấm vào đây để nhập dữ liệu từ file Excel/CSV. Đề xuất lấy file từ thư mục \\download\\DH_DNP\\.',
         },
         {
           target: '#btn-soan-hang',
@@ -278,7 +282,11 @@ export default function App() {
         },
         {
           target: '#btn-nhap-hang',
-          content: 'Hoặc bấm vào đây nếu bạn muốn Nhập hàng mới vào kho (màu vàng).',
+          content: 'Bấm vào đây nếu bạn muốn Nhập hàng mới vào kho (màu vàng).',
+        },
+        {
+          target: '#btn-xuat-hang',
+          content: 'Bấm vào đây để bắt đầu quy trình Xuất hàng (màu tím).',
         },
         {
           target: '#btn-help-docx',
@@ -367,6 +375,40 @@ export default function App() {
         {
           target: '#btn-save-csv',
           content: 'Tải file dữ liệu nhập hàng khi hoàn tất.',
+        },
+        {
+          target: '#btn-home',
+          content: 'Quay lại màn hình chính bằng nút HOME màu trắng.',
+        },
+        {
+          target: '#btn-exit',
+          content: 'Thoát ứng dụng bằng nút THOÁT màu đỏ nhấp nháy.',
+        },
+      ];
+    }
+
+    if (currentScreen === 'xuat_hang') {
+      return [
+        {
+          target: '#pxk-info-section',
+          content: 'Thông tin Số PXK, Khách hàng, Địa chỉ sẽ tự động được điền từ file import.',
+          disableBeacon: true,
+        },
+        {
+          target: '#vehicle-number-input',
+          content: 'Nhập hoặc quét số xe vận chuyển tại đây.',
+        },
+        {
+          target: '#btn-save-shipping',
+          content: 'Bấm nút này để cập nhật thông tin giao hàng cho toàn bộ đơn hàng.',
+        },
+        {
+          target: '#btn-export-pdf',
+          content: 'Đây là chức năng quan trọng nhất: Xuất Phiếu Xuất Kho ra file PDF chuyên nghiệp. File sẽ được lưu vào thư mục \\download\\DNP\\.',
+        },
+        {
+          target: '#review-section',
+          content: 'Bạn có thể kiểm tra lại danh sách hàng hóa trước khi xuất PDF.',
         },
         {
           target: '#btn-home',
@@ -1345,18 +1387,18 @@ export default function App() {
     
     // Dong 1
     d.setFont(fontName, 'bold'); d.text('Số PXK: ', 20, 30);
-    d.setFont(fontName, 'normal'); d.text(pxkNumber || '', 20 + d.getTextWidth('Số PXK: ') + labelGap, 30);
+    d.setFont(fontName, 'bolditalic'); d.text(pxkNumber || '', 20 + d.getTextWidth('Số PXK: ') + labelGap, 30);
     d.setFont(fontName, 'bold'); d.text('Số xe VC: ', 230, 30);
-    d.setFont(fontName, 'normal'); d.text(vehicleNumber || '', 230 + d.getTextWidth('Số xe VC: ') + labelGap, 30);
+    d.setFont(fontName, 'bolditalic'); d.text(vehicleNumber || '', 230 + d.getTextWidth('Số xe VC: ') + labelGap, 30);
 
     // Dong 2
     d.setFont(fontName, 'bold'); d.text('KHÁCH HÀNG: ', 20, 42);
-    d.setFont(fontName, 'normal'); d.text(customerName || '', 20 + d.getTextWidth('KHÁCH HÀNG: ') + labelGap, 42);
+    d.setFont(fontName, 'bolditalic'); d.text(customerName || '', 20 + d.getTextWidth('KHÁCH HÀNG: ') + labelGap, 42);
 
     // Dong 3
     d.setFont(fontName, 'bold'); d.text('ĐC nhận hàng: ', 20, 54);
     const addressText = deliveryAddress || '';
-    d.setFont(fontName, 'normal');
+    d.setFont(fontName, 'bolditalic');
     const splitAddress = d.splitTextToSize(addressText, 220); 
     const addressLines = splitAddress ? splitAddress.slice(0, 3) : [];
     if (addressLines.length > 0) d.text(addressLines as any, 20 + d.getTextWidth('ĐC nhận hàng: ') + labelGap, 54);
@@ -1463,6 +1505,24 @@ export default function App() {
               onScanClick={() => setScanningField('pickerName')} 
               placeholder="Nhập tên..."
             />
+
+            <ScanInput 
+              id="order-number-input"
+              label="Số đơn hàng (Nếu có)" 
+              value={activeOrderNumber} 
+              onChange={setActiveOrderNumber} 
+              onScanClick={() => setScanningField('welcomeOrderQR')} 
+              placeholder="Quét hoặc nhập số đơn..."
+            />
+
+            <button 
+              id="btn-import-csv"
+              onClick={() => triggerImport('soan')}
+              className="w-full py-3 bg-white border-2 border-dashed border-gray-300 text-gray-600 font-bold rounded-xl flex items-center justify-center gap-2 hover:bg-gray-50 hover:border-blue-300 hover:text-blue-600 transition-all shadow-sm"
+            >
+              <Upload size={20} />
+              Nhập File CSV (Từ \download\DH_DNP\)
+            </button>
           </div>
 
           <div className="space-y-3">
@@ -1563,6 +1623,7 @@ export default function App() {
           </button>
           <button 
             onClick={downloadUserGuideDocx}
+            id="btn-help-docx"
             className="bg-white/20 p-2 rounded-lg hover:bg-white/30 transition-colors"
             title="Tải hướng dẫn (.docx)"
           >
@@ -1632,16 +1693,17 @@ export default function App() {
           />
 
           {currentScreen === 'xuat_hang' && (
-            <>
+            <div id="pxk-info-section" className="space-y-3 pt-2 border-t border-purple-100">
               <ScanInput label="Số PXK" value={pxkNumber} onChange={setPxkNumber} onScanClick={() => setScanningField('pxkNumber')} placeholder="Số PXK (từ đơn)..." disabled={false} />
               <ScanInput label="Khách hàng" value={customerName} onChange={setCustomerName} onScanClick={() => {}} placeholder="Tên khách hàng (từ đơn)..." disabled={false} />
               <ScanInput label="Địa chỉ giao hàng" value={deliveryAddress} onChange={setDeliveryAddress} onScanClick={() => {}} placeholder="Địa chỉ (từ đơn)..." disabled={false} />
               
               <div className="flex items-end gap-2">
                 <div className="flex-1">
-                  <ScanInput label="Số xe vận chuyển" value={vehicleNumber} onChange={setVehicleNumber} onScanClick={() => setScanningField('vehicleNumber')} placeholder="Nhập hoặc quét số xe..." disabled={false} />
+                  <ScanInput id="vehicle-number-input" label="Số xe vận chuyển" value={vehicleNumber} onChange={setVehicleNumber} onScanClick={() => setScanningField('vehicleNumber')} placeholder="Nhập hoặc quét số xe..." disabled={false} />
                 </div>
                 <button 
+                  id="btn-save-shipping"
                   onClick={updateShippingInfoForAll}
                   className="p-3 bg-blue-100 text-blue-700 rounded-xl hover:bg-blue-200 transition-colors flex items-center justify-center h-[46px] mb-[1px]"
                   title="Cập nhật thông tin giao hàng cho toàn bộ đơn"
@@ -1649,7 +1711,7 @@ export default function App() {
                   <Save size={20} />
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
 
@@ -2273,7 +2335,7 @@ export default function App() {
             Xuất CSV
           </button>
           <button 
-            id="btn-save-pdf"
+            id="btn-export-pdf"
             onClick={handleDownloadPDF}
             disabled={currentOrderRecords.length === 0}
             className={`flex-1 py-3.5 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md ${
