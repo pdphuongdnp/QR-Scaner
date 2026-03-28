@@ -1,8 +1,8 @@
 import { jsPDF } from 'jspdf';
-import 'jspdf-autotable';
+import autoTable from 'jspdf-autotable';
 import { useState, useEffect, useRef } from 'react';
-import { format, parse } from 'date-fns';
-import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers, Upload, Check, Package } from 'lucide-react';
+import { format, parse, isValid } from 'date-fns';
+import { QrCode, Plus, Download, Trash2, FileText, ShoppingCart, ChevronLeft, ChevronRight, Edit, X, History, Save, Home, HelpCircle, Info, Maximize, LogOut, Layers, Upload, Check, Package, FileDown } from 'lucide-react';
 import { Scanner } from './components/Scanner';
 import { GuideModal } from './components/GuideModal';
 import { downloadUserGuideDocx } from './utils/generateDocx';
@@ -108,20 +108,37 @@ export default function App() {
   const closeModal = () => setModal(prev => ({ ...prev, isOpen: false }));
 
   // Load records from localStorage on initial render
-  const [records, setRecords] = useState<Record[]>(() => {
-    const saved = localStorage.getItem('qr_scanner_records');
+  const [recordsSoan, setRecordsSoan] = useState<Record[]>(() => {
+    const saved = localStorage.getItem('qr_scanner_records_soan');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [recordsNhap, setRecordsNhap] = useState<Record[]>(() => {
+    const saved = localStorage.getItem('qr_scanner_records_nhap');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [recordsXuat, setRecordsXuat] = useState<Record[]>(() => {
+    const saved = localStorage.getItem('qr_scanner_records_xuat');
     return saved ? JSON.parse(saved) : [];
   });
 
-  const [activeOrderNumber, setActiveOrderNumber] = useState(() => {
-    return localStorage.getItem('qr_scanner_active_order') || '';
-  });
+  const [activeOrderSoan, setActiveOrderSoan] = useState(() => localStorage.getItem('qr_scanner_active_order_soan') || '');
+  const [activeOrderNhap, setActiveOrderNhap] = useState(() => localStorage.getItem('qr_scanner_active_order_nhap') || '');
+  const [activeOrderXuat, setActiveOrderXuat] = useState(() => localStorage.getItem('qr_scanner_active_order_xuat') || '');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [pickerName, setPickerName] = useState(() => {
-    return localStorage.getItem('qr_scanner_picker_name') || '';
+  const [pickerName, setPickerName] = useState(() => localStorage.getItem('qr_scanner_picker_name') || '');
+  const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+
+  const [importedFilesSoan, setImportedFilesSoan] = useState<{name: string, lastModified: number, size: number}[]>(() => {
+    const saved = localStorage.getItem('qr_scanner_imported_files_soan');
+    return saved ? JSON.parse(saved) : [];
   });
-  const [importedFiles, setImportedFiles] = useState<{name: string, lastModified: number, size: number}[]>(() => {
-    const saved = localStorage.getItem('qr_scanner_imported_files');
+  const [importedFilesNhap, setImportedFilesNhap] = useState<{name: string, lastModified: number, size: number}[]>(() => {
+    const saved = localStorage.getItem('qr_scanner_imported_files_nhap');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [importedFilesXuat, setImportedFilesXuat] = useState<{name: string, lastModified: number, size: number}[]>(() => {
+    const saved = localStorage.getItem('qr_scanner_imported_files_xuat');
     return saved ? JSON.parse(saved) : [];
   });
 
@@ -146,8 +163,41 @@ export default function App() {
   }, [deliveryAddress]);
 
   useEffect(() => {
-    localStorage.setItem('qr_scanner_records', JSON.stringify(records));
-  }, [records]);
+    localStorage.setItem('qr_scanner_records_soan', JSON.stringify(recordsSoan));
+  }, [recordsSoan]);
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_records_nhap', JSON.stringify(recordsNhap));
+  }, [recordsNhap]);
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_records_xuat', JSON.stringify(recordsXuat));
+  }, [recordsXuat]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_active_order_soan', activeOrderSoan);
+  }, [activeOrderSoan]);
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_active_order_nhap', activeOrderNhap);
+  }, [activeOrderNhap]);
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_active_order_xuat', activeOrderXuat);
+  }, [activeOrderXuat]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_imported_files_soan', JSON.stringify(importedFilesSoan));
+  }, [importedFilesSoan]);
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_imported_files_nhap', JSON.stringify(importedFilesNhap));
+  }, [importedFilesNhap]);
+  useEffect(() => {
+    localStorage.setItem('qr_scanner_imported_files_xuat', JSON.stringify(importedFilesXuat));
+  }, [importedFilesXuat]);
+
+  const records = currentScreen === 'soan_hang' ? recordsSoan : (currentScreen === 'nhap_hang' ? recordsNhap : recordsXuat);
+  const setRecords = currentScreen === 'soan_hang' ? setRecordsSoan : (currentScreen === 'nhap_hang' ? setRecordsNhap : setRecordsXuat);
+  const activeOrderNumber = currentScreen === 'soan_hang' ? activeOrderSoan : (currentScreen === 'nhap_hang' ? activeOrderNhap : activeOrderXuat);
+  const setActiveOrderNumber = currentScreen === 'soan_hang' ? setActiveOrderSoan : (currentScreen === 'nhap_hang' ? setActiveOrderNhap : setActiveOrderXuat);
+  const importedFiles = currentScreen === 'soan_hang' ? importedFilesSoan : (currentScreen === 'nhap_hang' ? importedFilesNhap : importedFilesXuat);
+  const setImportedFiles = currentScreen === 'soan_hang' ? setImportedFilesSoan : (currentScreen === 'nhap_hang' ? setImportedFilesNhap : setImportedFilesXuat);
 
   useEffect(() => {
     localStorage.setItem('qr_scanner_active_order', activeOrderNumber);
@@ -340,15 +390,19 @@ export default function App() {
   // Derived state: records for the CURRENT order only, sorted by newest first
   const currentOrderRecords = records
     .filter(r => 
-      r.orderNumber === activeOrderNumber && 
-      r.type === currentScreen
+      (r.orderNumber || '').trim() === (activeOrderNumber || '').trim() && 
+      (currentScreen === 'welcome' || r.type === currentScreen)
     )
-    .sort((a, b) => b.createdAt - a.createdAt);
+    .sort((a, b) => {
+      const timeA = typeof a.createdAt === 'number' ? a.createdAt : new Date(a.createdAt).getTime();
+      const timeB = typeof b.createdAt === 'number' ? b.createdAt : new Date(b.createdAt).getTime();
+      return timeB - timeA;
+    });
 
   const availableOrders = Array.from(new Set(records.filter(r => r.type === currentScreen).map(r => r.orderNumber))).filter(Boolean);
 
   // Pagination logic
-  const itemsPerPage = 7;
+  const itemsPerPage = 14;
   const totalPages = Math.max(1, Math.ceil(currentOrderRecords.length / itemsPerPage));
   const safeCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
 
@@ -365,35 +419,37 @@ export default function App() {
     safeCurrentPage * itemsPerPage
   );
 
+  // Track if we've already auto-populated shipping info for the current order to avoid overwriting manual changes
+  const lastAutoPopulatedOrder = useRef<string | null>(null);
+
   // Auto-populate shipping info from imported records for Export screen
   useEffect(() => {
-    if (currentScreen === 'xuat_hang') {
-      if (activeOrderNumber && currentOrderRecords.length > 0) {
+    if (currentScreen === 'xuat_hang' && activeOrderNumber) {
+      // Only auto-populate if we haven't done it for this specific order yet
+      if (lastAutoPopulatedOrder.current !== activeOrderNumber && currentOrderRecords.length > 0) {
         // Find the first record that has any shipping info
         const firstWithInfo = currentOrderRecords.find(r => r.pxkNumber || r.customerName || r.deliveryAddress || r.vehicleNumber);
         
         if (firstWithInfo) {
-          // Always sync with the data from the records (which comes from the file)
           setPxkNumber(firstWithInfo.pxkNumber || '');
           setCustomerName(firstWithInfo.customerName || firstWithInfo.khachHang || '');
           setDeliveryAddress(firstWithInfo.deliveryAddress || '');
           setVehicleNumber(firstWithInfo.vehicleNumber || '');
-        } else {
-          // No info found in any records for this order
-          setPxkNumber('');
-          setCustomerName('');
-          setDeliveryAddress('');
-          setVehicleNumber('');
+          lastAutoPopulatedOrder.current = activeOrderNumber;
         }
-      } else {
-        // No active order or no records for it
-        setPxkNumber('');
-        setCustomerName('');
-        setDeliveryAddress('');
-        setVehicleNumber('');
       }
+    } else if (currentScreen === 'xuat_hang' && !activeOrderNumber) {
+      // Reset if no order is active on xuat_hang screen
+      setPxkNumber('');
+      setCustomerName('');
+      setDeliveryAddress('');
+      setVehicleNumber('');
+      lastAutoPopulatedOrder.current = null;
+    } else {
+      // If we leave the screen, reset the ref so it can re-populate if we come back
+      lastAutoPopulatedOrder.current = null;
     }
-  }, [currentScreen, activeOrderNumber, currentOrderRecords]);
+  }, [currentScreen, activeOrderNumber, currentOrderRecords.length > 0]);
 
   // Save to localStorage whenever records change
   useEffect(() => {
@@ -1089,7 +1145,6 @@ export default function App() {
     showConfirm('Bạn có chắc muốn xóa bản ghi này?', () => {
       setRecords(prev => {
         const updated = prev.filter(r => r.id !== id);
-        // Force synchronous update to localStorage to prevent data loss on immediate reload
         localStorage.setItem('qr_scanner_records', JSON.stringify(updated));
         return updated;
       });
@@ -1098,7 +1153,6 @@ export default function App() {
         handleCancelEdit();
       }
       
-      // Clear input fields to avoid confusion
       setLocation('');
       setProductLocation('');
       setProductName('');
@@ -1116,262 +1170,227 @@ export default function App() {
       setTrongLuong('');
       setTaiTrongXe('');
       
-      // Reset review index to make the UI change obvious
-      setCurrentPage(1);
-      
       showToast('Đã xóa bản ghi thành công!');
     });
   };
 
-  const generateXuatKhoPDF = () => {
-    if (currentOrderRecords.length === 0) {
-      showAlert('Không có dữ liệu để xuất PDF');
-      return;
-    }
-
-    const doc = new jsPDF();
-    
-    // Basic Vietnamese support in jsPDF is tricky without custom fonts, 
-    // but let's try to use standard ones.
-    doc.setFont('helvetica', 'bold');
-    doc.setFontSize(18);
-    doc.text('PHIEU XUAT KHO', 105, 15, { align: 'center' });
-    
-    doc.setFont('helvetica', 'normal');
-    doc.setFontSize(10);
-    doc.text(`So PXK: ${pxkNumber || 'N/A'}`, 15, 25);
-    doc.text(`Ngay: ${format(new Date(), 'dd/MM/yyyy')}`, 15, 30);
-    doc.text(`Khach hang: ${customerName || 'N/A'}`, 15, 35);
-    doc.text(`Dia chi: ${deliveryAddress || 'N/A'}`, 15, 40);
-    doc.text(`So xe: ${vehicleNumber || 'N/A'}`, 15, 45);
-    doc.text(`Nguoi xuat: ${pickerName || 'N/A'}`, 15, 50);
-
-    const tableData = currentOrderRecords.map((r, index) => [
-      index + 1,
-      r.maBravo || '',
-      r.productName || '',
-      r.dvt || '',
-      r.quantity || '',
-      r.note || ''
-    ]);
-
-    (doc as any).autoTable({
-      startY: 55,
-      head: [['STT', 'Ma hang', 'Ten hang', 'DVT', 'S.Luong', 'Ghi chu']],
-      body: tableData,
-      theme: 'grid',
-      headStyles: { fillColor: [41, 128, 185], textColor: 255 },
-      styles: { fontSize: 8, cellPadding: 2 },
-      columnStyles: {
-        0: { cellWidth: 10 },
-        1: { cellWidth: 25 },
-        2: { cellWidth: 65 },
-        3: { cellWidth: 20 },
-        4: { cellWidth: 25 },
-        5: { cellWidth: 45 }
-      }
-    });
-
-    const finalY = (doc as any).lastAutoTable.finalY + 10;
-    doc.text('Nguoi nhan hang', 40, finalY);
-    doc.text('(Ky, ho ten)', 40, finalY + 5);
-    
-    doc.text('Nguoi xuat kho', 140, finalY);
-    doc.text('(Ky, ho ten)', 140, finalY + 5);
-
-    doc.save(`Phieu_Xuat_Kho_${activeOrderNumber}.pdf`);
-    showToast('Đã xuất file PDF thành công!');
-  };
-
   const handleDownload = () => {
-    if (currentOrderRecords.length === 0) {
-      showAlert('Không có dữ liệu để tải xuống');
-      return;
-    }
-
-    if (currentScreen === 'xuat_hang') {
-      generateXuatKhoPDF();
-      // Continue to CSV export to support Power Query as requested
-    }
-
-    const escapeCSV = (str: string) => {
-      if (!str) return '';
-      const stringified = String(str);
-      if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
-        return '"' + stringified.replace(/"/g, '""') + '"';
+    try {
+      if (currentOrderRecords.length === 0) {
+        showAlert('Không có dữ liệu để tải xuống!');
+        return;
       }
-      return stringified;
-    };
 
-    // Format:
-    // 1. Nhập: N_ddMMMyy_hhmmss_tên người nhập
-    // 2. Soạn: S_số đơn hàng_ddMMMyy_hhmmss_tên người soạn
-    // 3. Xuất: X_số đơn hàng_ddMMMyy_hhmmss_tên người xuất
-    if (currentOrderRecords.length === 0) {
-      showAlert('Không có dữ liệu để xuất!');
-      return;
-    }
+      const isNhap = currentScreen === 'nhap_hang';
+      const isXuat = currentScreen === 'xuat_hang';
+      const now = new Date();
+      const timestamp = format(now, 'ddMMMyy_HHmmss');
+      const fileCreationTime = format(now, 'dd/MM/yyyy HH:mm:ss');
+      
+      const safePickerName = (pickerName || 'unnamed').trim();
+      const safeOrderNumber = (activeOrderNumber || 'no_order').trim();
+      
+      let fileName = isNhap ? `NF_${timestamp}_${safePickerName}.csv` : (isXuat ? `XF_${safeOrderNumber}_${timestamp}_${safePickerName}.csv` : `SF_${safeOrderNumber}_${timestamp}_${safePickerName}.csv`);
 
-    showToast('Đang chuẩn bị file CSV...');
-    
-    const isNhap = currentOrderRecords.some(r => r.type === 'nhap_hang');
-    const isXuat = currentOrderRecords.some(r => r.type === 'xuat_hang');
-    const now = new Date();
-    const timestamp = format(now, 'ddMMMyy_HHmmss');
-    const fileCreationTime = format(now, 'dd/MM/yyyy HH:mm:ss');
-    let fileName = '';
-    
-    if (isNhap) {
-      fileName = `NF_${timestamp}_${pickerName}.csv`;
-    } else if (isXuat) {
-      fileName = `XF_${activeOrderNumber}_${timestamp}_${pickerName}.csv`;
-    } else {
-      fileName = `SF_${activeOrderNumber}_${timestamp}_${pickerName}.csv`;
-    }
-    
-    // Create content (comma separated)
-    let header = '';
-    if (isNhap) {
-      header = [
-        'STT', 'Ngày', 'Mã hàng', 'Tên hàng', 'Số lượng cái', 
-        'Số lượng bao', 'Qui cách bao', 'Số lượng lẻ', 
-        'Vị trí nhập thực tế', 'Số lượng tại vị trí', 'Ghi chú khi nhập hàng', 
-        'Người nhập', 'Ngày giờ tạo file'
-      ].map(escapeCSV).join(',');
-    } else {
-      header = [
+      const escapeCSV = (str: any) => {
+        if (str === null || str === undefined) return '';
+        const stringified = String(str);
+        if (stringified.includes(',') || stringified.includes('"') || stringified.includes('\n')) {
+          return '"' + stringified.replace(/"/g, '""') + '"';
+        }
+        return stringified;
+      };
+
+      let header = [
         'STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'ĐC Nhận hàng', 
         'Số PXK', 'Số xe VC', 'Đơn hàng', 'ĐVT', 'SL Thực Xuất(cái)', 
-        'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 'Thông tin mã hàng', 
-        'Nhân viên quản hàng', 'Trọng lượng( kg)', 'Tải trọng xe(kg)',
-        'Vị trí chuyển đến', 'Người soạn/nhập', 'Vị trí thực tế', 'Số lượng thực tế', 'Số lượng thực xuất', 'Loại', 'Ghi chú', 'Ngày giờ tạo file'
+        'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 'Vị trí thực tế', 'Số lượng thực tế', 'Ghi chú', 'Ngày giờ tạo file'
       ].map(escapeCSV).join(',');
+      
+      let stt = 1;
+      const rows = currentOrderRecords.flatMap(r => {
+        const createdDate = r.createdAt ? new Date(r.createdAt) : new Date();
+        const dateStr = isValid(createdDate) ? format(createdDate, 'dd/MM/yyyy') : '';
+
+        const baseRow = [
+          stt++, dateStr, r.maBravo || '', r.productName || '', r.khachHang || r.customerName || '',
+          r.deliveryAddress || '', r.pxkNumber || '', r.vehicleNumber || '', r.orderNumber || '', 
+          r.dvt || '', r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', 
+          r.location || '', r.quantity || '', r.note || '', fileCreationTime
+        ];
+
+        if (r.multiLocations && r.multiLocations.length > 0) {
+          return r.multiLocations.map(pair => {
+            const newRow = [...baseRow];
+            newRow[0] = stt++; // Update STT
+            newRow[14] = pair.location || ''; // Update location
+            newRow[15] = pair.quantity || ''; // Update quantity
+            return newRow;
+          });
+        }
+        return [baseRow];
+      });
+      
+      const csvString = '\uFEFF' + [header, ...rows.map(row => row.map(escapeCSV).join(','))].join('\n');
+      const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', fileName);
+      document.body.appendChild(link);
+      link.click();
+      
+      setTimeout(() => {
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+      }, 200);
+      
+      showAlert(`File CSV đã được tải xuống máy của bạn!\nTên file: ${fileName}`);
+      if (currentScreen !== 'welcome') {
+        setCurrentScreen('welcome');
+        setActiveOrderNumber('');
+      }
+    } catch (error) {
+      console.error('CSV Export Error:', error);
+      showAlert('Lỗi khi xuất file CSV: ' + (error instanceof Error ? error.message : String(error)));
     }
-    
-    let stt = 1;
-    const rows = currentOrderRecords.flatMap(r => {
-      // If there are multiple locations, create a row for each
-      if (r.multiLocations && r.multiLocations.length > 0) {
-        return r.multiLocations.map(pair => {
-          if (isNhap) {
-            return [
-              stt++,
-              format(r.createdAt, 'dd/MM/yyyy'),
-              r.maBravo || '', 
-              r.productName || '', 
-              r.slThucXuat || '', 
-              r.slBaoCay || '', 
-              r.quiCach || '', 
-              r.slLe || '', 
-              pair.location || '', 
-              pair.quantity || '',
-              r.note || '',
-              r.pickerName || '', 
-              fileCreationTime
-            ];
-          }
-          return [
-            stt++,
-            format(r.createdAt, 'dd/MM/yyyy'),
-            r.maBravo || '', 
-            r.productName || '', 
-            r.khachHang || r.customerName || '',
-            r.deliveryAddress || '',
-            r.pxkNumber || '',
-            r.vehicleNumber || '',
-            r.orderNumber || '', 
-            r.dvt || '', 
-            r.slThucXuat || '', 
-            r.quiCach || '', 
-            r.slBaoCay || '', 
-            r.slLe || '', 
-            r.productLocation || r.thongTinMaHang || '', 
-            r.nhanVienQuanHang || '', 
-            r.trongLuong || '', 
-            r.taiTrongXe || '',
-            r.transferToLocation || '',
-            r.pickerName || '', 
-            pair.location || '', 
-            pair.quantity || '',
-            r.type === 'xuat_hang' ? (pair.quantity || r.slThucXuat || '') : '',
-            r.type === 'nhap_hang' ? 'Nhập hàng' : (r.type === 'xuat_hang' ? 'Xuất hàng' : 'Soạn hàng'),
-            r.note || '',
-            fileCreationTime
-          ];
-        });
-      }
-      
-      // Fallback for single location or legacy records
-      if (isNhap) {
-        return [[
-          stt++,
-          format(r.createdAt, 'dd/MM/yyyy'),
-          r.maBravo || '', 
-          r.productName || '', 
-          r.slThucXuat || '', 
-          r.slBaoCay || '', 
-          r.quiCach || '', 
-          r.slLe || '', 
-          r.location || '', 
-          r.quantity || '',
-          r.note || '',
-          r.pickerName || '', 
-          fileCreationTime
-        ]];
-      }
-      
-      return [[
-        stt++,
-        format(r.createdAt, 'dd/MM/yyyy'),
-        r.maBravo || '', 
-        r.productName || '', 
-        r.khachHang || r.customerName || '',
-        r.deliveryAddress || '',
-        r.pxkNumber || '',
-        r.vehicleNumber || '',
-        r.orderNumber || '', 
-        r.dvt || '', 
-        r.slThucXuat || '', 
-        r.quiCach || '', 
-        r.slBaoCay || '', 
-        r.slLe || '', 
-        r.productLocation || r.thongTinMaHang || '', 
-        r.nhanVienQuanHang || '', 
-        r.trongLuong || '', 
-        r.taiTrongXe || '',
-        r.transferToLocation || '',
-        r.pickerName || '', 
-        r.location || '', 
-        r.quantity || '',
-        r.type === 'xuat_hang' ? (r.quantity || r.slThucXuat || '') : '',
-        r.type === 'nhap_hang' ? 'Nhập hàng' : (r.type === 'xuat_hang' ? 'Xuất hàng' : 'Soạn hàng'),
-        r.note || '',
-        fileCreationTime
-      ]];
-    }).map(row => row.map(escapeCSV).join(','));
+  };
 
-    // Add BOM for Excel UTF-8 compatibility
-    const content = '\uFEFF' + [header, ...rows].join('\n');
-    
-    const blob = new Blob([content], { type: 'text/csv;charset=utf-8' });
-    const url = URL.createObjectURL(blob);
-    
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    
-    // Small delay for mobile browsers to process
-    setTimeout(() => {
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }, 200);
+  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    const len = bytes.byteLength;
+    const chunkSize = 8192; // Xử lý theo khối để tránh lỗi stack
+    for (let i = 0; i < len; i += chunkSize) {
+      const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
+      binary += String.fromCharCode.apply(null, Array.from(chunk));
+    }
+    return window.btoa(binary);
+  };
 
-    // Auto redirect to welcome screen to start a new order
-    setCurrentScreen('welcome');
-    setActiveOrderNumber('');
-    // Keep pickerName so they don't have to retype it
+  const handleDownloadPDF = async () => {
+    try {
+      if (currentOrderRecords.length === 0) {
+        showAlert('Không có dữ liệu để xuất!');
+        return;
+      }
+
+      setIsGeneratingPDF(true);
+      showToast('Đang tạo file PDF Unicode...');
+      
+      const isNhap = currentScreen === 'nhap_hang';
+      const isXuat = currentScreen === 'xuat_hang';
+      const now = new Date();
+      const timestamp = format(now, 'ddMMMyy_HHmmss');
+      
+      const safePickerName = (pickerName || 'unnamed').trim();
+      const safeOrderNumber = (activeOrderNumber || 'no_order').trim();
+
+      let title = isNhap ? 'PHIẾU ĐỀ NGHỊ NHẬP KHO' : (isXuat ? 'PHIẾU ĐỀ NGHỊ XUẤT KHO' : 'PHIẾU ĐỀ NGHỊ SOẠN KHO');
+      let fileName = isNhap ? `NF_${timestamp}_${safePickerName}.pdf` : (isXuat ? `XF_${safeOrderNumber}_${timestamp}_${safePickerName}.pdf` : `SF_${safeOrderNumber}_${timestamp}_${safePickerName}.pdf`);
+
+      const doc = new jsPDF('l', 'mm', 'a4');
+      let fontName = 'times';
+
+      try {
+        // Sử dụng font Tinos (tương đương Times New Roman) hỗ trợ Unicode
+        const fontUrl = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/tinos/Tinos-Regular.ttf';
+        const response = await fetch(fontUrl);
+        if (!response.ok) throw new Error('Không thể tải font từ máy chủ');
+        const buffer = await response.arrayBuffer();
+        const base64Font = arrayBufferToBase64(buffer);
+        
+        doc.addFileToVFS('Tinos-Regular.ttf', base64Font);
+        doc.addFont('Tinos-Regular.ttf', 'Tinos', 'normal');
+        doc.setFont('Tinos');
+        fontName = 'Tinos';
+        console.log('Đã nhúng font Unicode thành công');
+      } catch (fontError) {
+        console.warn('Lỗi tải font Unicode, sử dụng font mặc định:', fontError);
+        doc.setFont('times', 'normal');
+        fontName = 'times';
+      }
+
+      doc.setFontSize(18);
+      doc.text(title, 148, 15, { align: 'center' });
+      
+      doc.setFontSize(10);
+      doc.text(`Số PXK: ${pxkNumber || ''}`, 20, 25);
+      doc.text(`Số xe VC: ${vehicleNumber || ''}`, 230, 25);
+
+      doc.text(`KHÁCH HÀNG: ${customerName || ''}`, 20, 35);
+      doc.text(`ĐC nhận hàng: ${deliveryAddress || ''}`, 20, 45);
+
+      const headers = isNhap 
+        ? [['STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Đơn hàng', 'ĐVT', 'SL Nhập', 'Qui cách', 'SL Bao', 'SL Lẻ', 'Trọng lượng', 'Ghi chú']]
+        : [['STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Đơn hàng', 'ĐVT', 'SL Thực Xuất', 'Qui cách', 'SL Bao', 'SL Lẻ', 'Trọng lượng', 'Tải trọng xe']];
+
+      let stt = 1;
+      const data = currentOrderRecords.map(r => {
+        const dateStr = format(new Date(r.createdAt), 'dd/MM/yyyy');
+        return isNhap ? [
+          stt++, dateStr, r.maBravo || '', r.productName || '', r.orderNumber || '', r.dvt || '',
+          r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', r.trongLuong || '', r.note || ''
+        ] : [
+          stt++, dateStr, r.maBravo || '', r.productName || '', r.orderNumber || '', r.dvt || '',
+          r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', r.trongLuong || '', r.taiTrongXe || ''
+        ];
+      });
+
+      autoTable(doc, {
+        startY: 55,
+        head: headers,
+        body: data,
+        theme: 'grid',
+        headStyles: { 
+          fillColor: [240, 240, 240], 
+          textColor: [0, 0, 0], 
+          lineWidth: 0.1, 
+          fontStyle: 'bold', 
+          font: fontName 
+        },
+        styles: { 
+          fontSize: 8, 
+          cellPadding: 2, 
+          font: fontName 
+        },
+        columnStyles: {
+          0: { cellWidth: 10 },
+          1: { cellWidth: 20 },
+          2: { cellWidth: 25 },
+          3: { cellWidth: 50 },
+          4: { cellWidth: 25 },
+          5: { cellWidth: 15 },
+          6: { cellWidth: 20 },
+          7: { cellWidth: 20 },
+          8: { cellWidth: 20 },
+          9: { cellWidth: 20 },
+          10: { cellWidth: 20 },
+          11: { cellWidth: 20 }
+        }
+      });
+
+      const finalY = (doc as any).lastAutoTable.finalY + 20;
+      doc.setFontSize(10);
+      doc.text('Người Lập Phiếu', 30, finalY);
+      doc.text('Thủ kho', 100, finalY);
+      doc.text('Tài xế', 170, finalY);
+      doc.text('Bảo vệ', 240, finalY);
+
+      doc.save(fileName);
+      showAlert(`Đã xuất file PDF thành công: ${fileName}`);
+      
+      // Reset về màn hình chào sau khi xuất thành công
+      setCurrentScreen('welcome');
+      setActiveOrderSoan('');
+      setActiveOrderNhap('');
+      setActiveOrderXuat('');
+    } catch (error) {
+      console.error('PDF Export Error:', error);
+      showAlert('Lỗi khi tạo file PDF. Vui lòng thử lại.');
+    } finally {
+      setIsGeneratingPDF(false);
+    }
   };
 
   // Calculate orders for Welcome screen
@@ -1566,7 +1585,7 @@ export default function App() {
             onChange={setPickerName} 
             onScanClick={() => {}} 
             placeholder="Tên người thao tác"
-            disabled={true}
+            disabled={false}
           />
           
           <ScanInput 
@@ -1641,8 +1660,8 @@ export default function App() {
                 </div>
 
                 <div className="grid grid-cols-1 gap-3">
-                  <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
-                    <ScanInput label="Tên sản phẩm" value={productName} onChange={() => {}} onScanClick={() => {}} placeholder="Tên sản phẩm" disabled={true} />
+                  <div>
+                    <ScanInput label="Tên sản phẩm" value={productName} onChange={setProductName} onScanClick={() => {}} placeholder="Tên sản phẩm" disabled={false} />
                     
                     <div className="grid grid-cols-1 gap-3 pt-3 mt-3 border-t border-purple-100">
                       <div>
@@ -1740,7 +1759,7 @@ export default function App() {
                     />
                   </div>
 
-                  <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
+                  <div>
                     <div className="grid grid-cols-1 gap-3 pt-3 mt-3 border-t border-amber-100">
                       <div>
                         <label className="block text-sm font-bold text-amber-700 mb-1">Số lượng cái</label>
@@ -1800,7 +1819,7 @@ export default function App() {
                         onChange={setLocation} 
                         onScanClick={() => setScanningField('location')} 
                         placeholder="Nhập hoặc quét mã..."
-                        disabled={!productName.trim() && !editingId}
+                        disabled={false}
                       />
 
                       <div id="quantity-input" className="mt-3">
@@ -1809,7 +1828,7 @@ export default function App() {
                           type="number" 
                           value={quantity}
                           onChange={(e) => setQuantity(e.target.value)}
-                          disabled={!productName.trim() && !editingId}
+                          disabled={false}
                           className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none transition-all disabled:bg-gray-50"
                           placeholder="Nhập số lượng..."
                         />
@@ -1817,7 +1836,7 @@ export default function App() {
 
                       <button 
                         onClick={addLocationPair}
-                        disabled={!productName.trim() && !editingId}
+                        disabled={false}
                         className="w-full py-2.5 bg-amber-50 text-amber-700 rounded-xl border border-dashed border-amber-300 hover:bg-amber-100 transition-colors flex items-center justify-center gap-2 text-sm font-bold disabled:opacity-50 mt-3"
                       >
                         <Plus size={18} /> Thêm vị trí & số lượng này
@@ -1845,7 +1864,7 @@ export default function App() {
                           onChange={setTransferToLocation} 
                           onScanClick={() => setScanningField('transferToLocation')} 
                           placeholder="Nhập hoặc quét mã chuyển đến..."
-                          disabled={!productName.trim() && !editingId}
+                          disabled={false}
                         />
                       </div>
                       
@@ -1855,7 +1874,7 @@ export default function App() {
                           value={note}
                           onChange={(e) => setNote(e.target.value)}
                           rows={3}
-                          disabled={!productName.trim() && !editingId}
+                          disabled={false}
                           className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 focus:border-amber-500 outline-none resize-none transition-all disabled:bg-gray-50"
                           placeholder="Nhập ghi chú..."
                         />
@@ -1886,14 +1905,15 @@ export default function App() {
                   </button>
                 </div>
 
-                <div className={!productName.trim() && !editingId ? 'opacity-50 pointer-events-none' : ''}>
+                <div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">Vị trí mã hàng</label>
                     <textarea 
                       value={productLocation}
-                      disabled={true}
+                      onChange={(e) => setProductLocation(e.target.value)}
+                      disabled={false}
                       rows={8}
-                      className="w-full p-3 border border-gray-300 rounded-xl bg-gray-100 text-gray-500 cursor-not-allowed outline-none resize-none"
+                      className="w-full p-3 border border-gray-300 rounded-xl outline-none resize-none transition-all"
                       placeholder="Trích xuất từ QR..."
                     />
                   </div>
@@ -1902,10 +1922,10 @@ export default function App() {
                     id="product-name-display"
                     label="Tên sản phẩm" 
                     value={productName} 
-                    onChange={() => {}} 
+                    onChange={setProductName} 
                     onScanClick={() => {}} 
                     placeholder="Tên sản phẩm"
-                    disabled={true}
+                    disabled={false}
                   />
 
                   <ScanInput 
@@ -1915,7 +1935,7 @@ export default function App() {
                     onChange={setLocation} 
                     onScanClick={() => setScanningField('location')} 
                     placeholder="Nhập hoặc quét mã..."
-                    disabled={!productName.trim() && !editingId}
+                    disabled={false}
                   />
                   
                   <div id="quantity-input">
@@ -1926,7 +1946,7 @@ export default function App() {
                       type="number" 
                       value={quantity}
                       onChange={(e) => setQuantity(e.target.value)}
-                      disabled={!productName.trim() && !editingId}
+                      disabled={false}
                       className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50"
                       placeholder="Nhập số lượng..."
                     />
@@ -2172,17 +2192,28 @@ export default function App() {
 
       {/* Fixed Bottom Action */}
       <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/80 backdrop-blur-md border-t border-white/20 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
-        <div className="max-w-md mx-auto">
+        <div className="max-w-md mx-auto flex gap-3">
           <button 
             id="btn-save-csv"
             onClick={handleDownload}
             disabled={currentOrderRecords.length === 0}
-            className={`w-full py-3.5 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm ${
+            className={`flex-1 py-3.5 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md ${
               currentScreen === 'nhap_hang' ? 'bg-amber-500 hover:bg-amber-600' : currentScreen === 'xuat_hang' ? 'bg-purple-600 hover:bg-purple-700' : 'bg-blue-600 hover:bg-blue-700'
             }`}
           >
-            <Download size={20} /> 
-            {currentScreen === 'nhap_hang' ? 'Duyệt đợt nhập này' : currentScreen === 'xuat_hang' ? 'Hoàn tất và xuất dữ liệu' : 'Hoàn tất và tải file CSV'}
+            <FileDown size={20} /> 
+            Xuất CSV
+          </button>
+          <button 
+            id="btn-save-pdf"
+            onClick={handleDownloadPDF}
+            disabled={currentOrderRecords.length === 0}
+            className={`flex-1 py-3.5 disabled:bg-gray-300 disabled:text-gray-500 text-white font-semibold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-95 shadow-md ${
+              currentScreen === 'nhap_hang' ? 'bg-amber-600 hover:bg-amber-700' : currentScreen === 'xuat_hang' ? 'bg-purple-700 hover:bg-purple-800' : 'bg-blue-700 hover:bg-blue-800'
+            }`}
+          >
+            <FileText size={20} /> 
+            Xuất PDF
           </button>
         </div>
       </div>
