@@ -402,7 +402,7 @@ export default function App() {
   const availableOrders = Array.from(new Set(records.filter(r => r.type === currentScreen).map(r => r.orderNumber))).filter(Boolean);
 
   // Pagination logic
-  const itemsPerPage = 14;
+  const itemsPerPage = 7;
   const totalPages = Math.max(1, Math.ceil(currentOrderRecords.length / itemsPerPage));
   const safeCurrentPage = Math.max(1, Math.min(currentPage, totalPages));
 
@@ -733,16 +733,17 @@ export default function App() {
           });
 
           if (importedRecords.length > 0) {
-            // Update logic: instead of suffixing, we merge with existing records
-            // If orderNumber + maBravo exists, we update its shipping/original info
-            // If it doesn't exist, we add it.
+            // Xác định setter phù hợp dựa trên loại dữ liệu nhập vào
+            const firstType = importedRecords[0].type;
+            const targetSetter = firstType === 'nhap_hang' ? setRecordsNhap : (firstType === 'xuat_hang' ? setRecordsXuat : setRecordsSoan);
+            const targetActiveSetter = firstType === 'nhap_hang' ? setActiveOrderNhap : (firstType === 'xuat_hang' ? setActiveOrderXuat : setActiveOrderSoan);
             
-            setRecords(prev => {
+            targetSetter(prev => {
               const updatedRecords = [...prev];
               const newRecordsToAdd: Record[] = [];
               
               importedRecords.forEach(imported => {
-                // Find if this item already exists in this order
+                // Tìm xem mặt hàng này đã tồn tại trong đơn hàng này chưa
                 const existingIndex = updatedRecords.findIndex(r => 
                   r.orderNumber === imported.orderNumber && 
                   r.maBravo === imported.maBravo &&
@@ -750,19 +751,16 @@ export default function App() {
                 );
                 
                 if (existingIndex !== -1) {
-                  // Update existing record with new info from file
+                  // Cập nhật bản ghi hiện có với thông tin mới từ file
                   updatedRecords[existingIndex] = {
                     ...updatedRecords[existingIndex],
-                    // Update shipping info
                     pxkNumber: imported.pxkNumber || updatedRecords[existingIndex].pxkNumber,
                     customerName: imported.customerName || updatedRecords[existingIndex].customerName,
                     deliveryAddress: imported.deliveryAddress || updatedRecords[existingIndex].deliveryAddress,
                     vehicleNumber: imported.vehicleNumber || updatedRecords[existingIndex].vehicleNumber,
-                    // Update original quantities (targets)
                     originalSlThucXuat: imported.originalSlThucXuat,
                     originalSlBaoCay: imported.originalSlBaoCay,
                     originalSlLe: imported.originalSlLe,
-                    // Update other meta info
                     khachHang: imported.khachHang || updatedRecords[existingIndex].khachHang,
                     dvt: imported.dvt || updatedRecords[existingIndex].dvt,
                     quiCach: imported.quiCach || updatedRecords[existingIndex].quiCach,
@@ -774,7 +772,6 @@ export default function App() {
                     thongTinMaHang: imported.thongTinMaHang || updatedRecords[existingIndex].thongTinMaHang
                   };
                 } else {
-                  // New item for this order (or new order entirely)
                   newRecordsToAdd.push(imported);
                 }
               });
@@ -784,11 +781,10 @@ export default function App() {
             
             setImportedFiles(prev => [...prev, fileInfo]);
             
-            // Automatically select the first imported order and switch to the correct screen
+            // Tự động chọn đơn hàng đầu tiên và chuyển sang màn hình tương ứng
             const firstImported = importedRecords[0];
             if (firstImported) {
-              setActiveOrderNumber(firstImported.orderNumber);
-              // If picker name is empty, try to set it from the imported record
+              targetActiveSetter(firstImported.orderNumber);
               if (!pickerName && firstImported.pickerName) {
                 setPickerName(firstImported.pickerName);
               }
@@ -1203,8 +1199,8 @@ export default function App() {
 
       let header = [
         'STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Khách hàng', 'ĐC Nhận hàng', 
-        'Số PXK', 'Số xe VC', 'Đơn hàng', 'ĐVT', 'SL Thực Xuất(cái)', 
-        'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 'Vị trí thực tế', 'Số lượng thực tế', 'Ghi chú', 'Ngày giờ tạo file'
+        'Số PXK', 'Số xe VC', 'Đơn hàng', 'ĐVT', isNhap ? 'SL Nhập(cái)' : 'SL Thực Xuất(cái)', 
+        'Qui cách(Bao/Cây)', 'SL (Bao/Cây)', 'SL Lẻ', 'Trọng lượng', 'Vị trí thực tế', 'Số lượng thực tế', 'Ghi chú', 'Ngày giờ tạo file'
       ].map(escapeCSV).join(',');
       
       let stt = 1;
@@ -1216,7 +1212,7 @@ export default function App() {
           stt++, dateStr, r.maBravo || '', r.productName || '', r.khachHang || r.customerName || '',
           r.deliveryAddress || '', r.pxkNumber || '', r.vehicleNumber || '', r.orderNumber || '', 
           r.dvt || '', r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', 
-          r.location || '', r.quantity || '', r.note || '', fileCreationTime
+          r.trongLuong || '', r.location || '', r.quantity || '', r.note || '', fileCreationTime
         ];
 
         if (r.multiLocations && r.multiLocations.length > 0) {
@@ -1256,142 +1252,180 @@ export default function App() {
     }
   };
 
-  const arrayBufferToBase64 = (buffer: ArrayBuffer) => {
-    const bytes = new Uint8Array(buffer);
-    let binary = '';
-    const len = bytes.byteLength;
-    const chunkSize = 8192; // Xử lý theo khối để tránh lỗi stack
-    for (let i = 0; i < len; i += chunkSize) {
-      const chunk = bytes.subarray(i, Math.min(i + chunkSize, len));
-      binary += String.fromCharCode.apply(null, Array.from(chunk));
-    }
-    return window.btoa(binary);
+  const arrayBufferToBase64 = (buffer: ArrayBuffer): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const blob = new Blob([buffer]);
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const dataUrl = e.target?.result as string;
+        if (dataUrl) {
+          const base64 = dataUrl.split(',')[1];
+          resolve(base64);
+        } else {
+          reject(new Error('Không thể chuyển đổi ArrayBuffer sang Base64'));
+        }
+      };
+      reader.onerror = () => reject(new Error('Lỗi khi đọc file font'));
+      reader.readAsDataURL(blob);
+    });
   };
 
   const handleDownloadPDF = async () => {
-    try {
-      if (currentOrderRecords.length === 0) {
-        showAlert('Không có dữ liệu để xuất!');
-        return;
-      }
+ try {
+  if (currentOrderRecords.length === 0) { showAlert('Không có dữ liệu để xuất!'); return; }
+  setIsGeneratingPDF(true); showToast('Đang chuẩn bị dữ liệu PDF...');
+  const isNhap = currentScreen === 'nhap_hang'; const isXuat = currentScreen === 'xuat_hang';
+  const now = new Date(); const timestamp = format(now, 'ddMMMyy_HHmmss');
+  const safePickerName = (pickerName || 'unnamed').trim(); const safeOrderNumber = (activeOrderNumber || 'no_order').trim();
+  const title = isNhap ? 'PHIẾU ĐỀ NGHỊ NHẬP KHO' : (isXuat ? 'PHIẾU ĐỀ NGHỊ XUẤT KHO' : 'PHIẾU ĐỀ NGHỊ SOẠN KHO');
+  const fileName = isNhap ? `NF_${timestamp}_${safePickerName}.pdf` : (isXuat ? `XF_${safeOrderNumber}_${timestamp}_${safePickerName}.pdf` : `SF_${safeOrderNumber}_${timestamp}_${safePickerName}.pdf`);
+  
+  const doc = new jsPDF('l', 'mm', 'a4'); 
+  const fontName = 'Roboto';
 
-      setIsGeneratingPDF(true);
-      showToast('Đang tạo file PDF Unicode...');
-      
-      const isNhap = currentScreen === 'nhap_hang';
-      const isXuat = currentScreen === 'xuat_hang';
-      const now = new Date();
-      const timestamp = format(now, 'ddMMMyy_HHmmss');
-      
-      const safePickerName = (pickerName || 'unnamed').trim();
-      const safeOrderNumber = (activeOrderNumber || 'no_order').trim();
-
-      let title = isNhap ? 'PHIẾU ĐỀ NGHỊ NHẬP KHO' : (isXuat ? 'PHIẾU ĐỀ NGHỊ XUẤT KHO' : 'PHIẾU ĐỀ NGHỊ SOẠN KHO');
-      let fileName = isNhap ? `NF_${timestamp}_${safePickerName}.pdf` : (isXuat ? `XF_${safeOrderNumber}_${timestamp}_${safePickerName}.pdf` : `SF_${safeOrderNumber}_${timestamp}_${safePickerName}.pdf`);
-
-      const doc = new jsPDF('l', 'mm', 'a4');
-      let fontName = 'times';
-
-      try {
-        // Sử dụng font Tinos (tương đương Times New Roman) hỗ trợ Unicode
-        const fontUrl = 'https://cdn.jsdelivr.net/gh/google/fonts/ofl/tinos/Tinos-Regular.ttf';
-        const response = await fetch(fontUrl);
-        if (!response.ok) throw new Error('Không thể tải font từ máy chủ');
-        const buffer = await response.arrayBuffer();
-        const base64Font = arrayBufferToBase64(buffer);
-        
-        doc.addFileToVFS('Tinos-Regular.ttf', base64Font);
-        doc.addFont('Tinos-Regular.ttf', 'Tinos', 'normal');
-        doc.setFont('Tinos');
-        fontName = 'Tinos';
-        console.log('Đã nhúng font Unicode thành công');
-      } catch (fontError) {
-        console.warn('Lỗi tải font Unicode, sử dụng font mặc định:', fontError);
-        doc.setFont('times', 'normal');
-        fontName = 'times';
-      }
-
-      doc.setFontSize(18);
-      doc.text(title, 148, 15, { align: 'center' });
-      
-      doc.setFontSize(10);
-      doc.text(`Số PXK: ${pxkNumber || ''}`, 20, 25);
-      doc.text(`Số xe VC: ${vehicleNumber || ''}`, 230, 25);
-
-      doc.text(`KHÁCH HÀNG: ${customerName || ''}`, 20, 35);
-      doc.text(`ĐC nhận hàng: ${deliveryAddress || ''}`, 20, 45);
-
-      const headers = isNhap 
-        ? [['STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Đơn hàng', 'ĐVT', 'SL Nhập', 'Qui cách', 'SL Bao', 'SL Lẻ', 'Trọng lượng', 'Ghi chú']]
-        : [['STT', 'Ngày', 'Mã Bravo', 'Tên sản phẩm', 'Đơn hàng', 'ĐVT', 'SL Thực Xuất', 'Qui cách', 'SL Bao', 'SL Lẻ', 'Trọng lượng', 'Tải trọng xe']];
-
-      let stt = 1;
-      const data = currentOrderRecords.map(r => {
-        const dateStr = format(new Date(r.createdAt), 'dd/MM/yyyy');
-        return isNhap ? [
-          stt++, dateStr, r.maBravo || '', r.productName || '', r.orderNumber || '', r.dvt || '',
-          r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', r.trongLuong || '', r.note || ''
-        ] : [
-          stt++, dateStr, r.maBravo || '', r.productName || '', r.orderNumber || '', r.dvt || '',
-          r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', r.trongLuong || '', r.taiTrongXe || ''
-        ];
-      });
-
-      autoTable(doc, {
-        startY: 55,
-        head: headers,
-        body: data,
-        theme: 'grid',
-        headStyles: { 
-          fillColor: [240, 240, 240], 
-          textColor: [0, 0, 0], 
-          lineWidth: 0.1, 
-          fontStyle: 'bold', 
-          font: fontName 
-        },
-        styles: { 
-          fontSize: 8, 
-          cellPadding: 2, 
-          font: fontName 
-        },
-        columnStyles: {
-          0: { cellWidth: 10 },
-          1: { cellWidth: 20 },
-          2: { cellWidth: 25 },
-          3: { cellWidth: 50 },
-          4: { cellWidth: 25 },
-          5: { cellWidth: 15 },
-          6: { cellWidth: 20 },
-          7: { cellWidth: 20 },
-          8: { cellWidth: 20 },
-          9: { cellWidth: 20 },
-          10: { cellWidth: 20 },
-          11: { cellWidth: 20 }
-        }
-      });
-
-      const finalY = (doc as any).lastAutoTable.finalY + 20;
-      doc.setFontSize(10);
-      doc.text('Người Lập Phiếu', 30, finalY);
-      doc.text('Thủ kho', 100, finalY);
-      doc.text('Tài xế', 170, finalY);
-      doc.text('Bảo vệ', 240, finalY);
-
-      doc.save(fileName);
-      showAlert(`Đã xuất file PDF thành công: ${fileName}`);
-      
-      // Reset về màn hình chào sau khi xuất thành công
-      setCurrentScreen('welcome');
-      setActiveOrderSoan('');
-      setActiveOrderNhap('');
-      setActiveOrderXuat('');
-    } catch (error) {
-      console.error('PDF Export Error:', error);
-      showAlert('Lỗi khi tạo file PDF. Vui lòng thử lại.');
-    } finally {
-      setIsGeneratingPDF(false);
-    }
+  const loadFontBase64 = async (url: string) => {
+   try { 
+     const resp = await fetch(url, { cache: 'force-cache' }); 
+     if (!resp.ok) return ''; 
+     const buf = await resp.arrayBuffer(); 
+     return await arrayBufferToBase64(buf); 
+   } catch (e) { 
+     console.warn('Font load error:', e); 
+     return ''; 
+   }
   };
+
+  // chu thich: tai font tu thu muc public/fonts
+  console.log('PDF: Đang tải font Roboto...');
+  const reg = await loadFontBase64('/fonts/Roboto-Regular.ttf');
+  const bold = await loadFontBase64('/fonts/Roboto-Bold.ttf');
+  console.log('PDF: Font tải xong, độ dài:', reg.length, bold.length);
+
+  if (!reg || reg.length < 500) { 
+    showAlert('Không tải được font Roboto-Regular.ttf. Vui lòng kiểm tra file trong thư mục public/fonts.'); 
+    return; 
+  }
+
+  doc.addFileToVFS('Roboto-Regular.ttf', reg);
+  doc.addFont('Roboto-Regular.ttf', fontName, 'normal');
+  doc.addFont('Roboto-Regular.ttf', fontName, 'italic');
+  
+  if (bold && bold.length > 500) {
+    doc.addFileToVFS('Roboto-Bold.ttf', bold);
+    doc.addFont('Roboto-Bold.ttf', fontName, 'bold');
+    doc.addFont('Roboto-Bold.ttf', fontName, 'bolditalic');
+  } else {
+    // Fallback neu khong co bold
+    doc.addFont('Roboto-Regular.ttf', fontName, 'bold');
+    doc.addFont('Roboto-Regular.ttf', fontName, 'bolditalic');
+  }
+  
+  doc.setFont(fontName, 'normal');
+  console.log('PDF: Đã đăng ký font xong.');
+  showToast('Đang tạo trang PDF...');
+
+  const headers = isNhap
+   ? [['STT','Ngày','Mã Bravo','Tên sản phẩm','Đơn hàng','ĐVT','SL Nhập','Qui cách','SL Bao','SL Lẻ','Trọng lượng','Ghi chú']]
+   : [['STT','Ngày','Mã Bravo','Tên sản phẩm','Đơn hàng','ĐVT','SL Thực Xuất','Qui cách','SL Bao','SL Lẻ','Trọng lượng','Tải trọng xe']];
+
+  let stt = 1;
+  const allData = currentOrderRecords.map(r => {
+   const createdDate = r.createdAt ? new Date(r.createdAt) : new Date();
+   const dateStr = isValid(createdDate) ? format(createdDate, 'dd/MM/yyyy') : '';
+   return isNhap
+    ? [stt++, dateStr, r.maBravo || '', r.productName || '', r.orderNumber || '', r.dvt || '', r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', r.trongLuong || '', r.note || '']
+    : [stt++, dateStr, r.maBravo || '', r.productName || '', r.orderNumber || '', r.dvt || '', r.slThucXuat || '', r.quiCach || '', r.slBaoCay || '', r.slLe || '', r.trongLuong || '', r.taiTrongXe || ''];
+  });
+
+  // 1. Ham ve tieu de va thong tin chung (se goi o moi trang)
+  const drawHeader = (d: any) => {
+    d.setFontSize(18); d.setFont(fontName, 'bold'); d.text(title, 148, 15, { align: 'center' });
+    d.setFontSize(11); 
+    const labelGap = 3;
+    
+    // Dong 1
+    d.setFont(fontName, 'bold'); d.text('Số PXK: ', 20, 30);
+    d.setFont(fontName, 'normal'); d.text(pxkNumber || '', 20 + d.getTextWidth('Số PXK: ') + labelGap, 30);
+    d.setFont(fontName, 'bold'); d.text('Số xe VC: ', 230, 30);
+    d.setFont(fontName, 'normal'); d.text(vehicleNumber || '', 230 + d.getTextWidth('Số xe VC: ') + labelGap, 30);
+
+    // Dong 2
+    d.setFont(fontName, 'bold'); d.text('KHÁCH HÀNG: ', 20, 42);
+    d.setFont(fontName, 'normal'); d.text(customerName || '', 20 + d.getTextWidth('KHÁCH HÀNG: ') + labelGap, 42);
+
+    // Dong 3
+    d.setFont(fontName, 'bold'); d.text('ĐC nhận hàng: ', 20, 54);
+    const addressText = deliveryAddress || '';
+    d.setFont(fontName, 'normal');
+    const splitAddress = d.splitTextToSize(addressText, 220); 
+    const addressLines = splitAddress ? splitAddress.slice(0, 3) : [];
+    if (addressLines.length > 0) d.text(addressLines as any, 20 + d.getTextWidth('ĐC nhận hàng: ') + labelGap, 54);
+  };
+
+  // 2. Goi autoTable mot lan duy nhat cho tat ca du lieu
+  autoTable(doc, {
+    startY: 70,
+    margin: { top: 70 }, // Khoang cach de ve header o cac trang sau
+    head: headers,
+    body: allData,
+    theme: 'grid',
+    headStyles: { fillColor: [240,240,240], textColor: [0,0,0], lineWidth: 0.1, fontStyle: 'bold', font: fontName, halign: 'center', valign: 'middle', fontSize: 10 },
+    styles: { fontSize: 10.5, cellPadding: 3, font: fontName, overflow: 'linebreak', halign: 'center', valign: 'middle' },
+    columnStyles: { 
+      0: { cellWidth: 8 }, 1: { cellWidth: 18 }, 2: { cellWidth: 22 }, 
+      3: { cellWidth: 75, halign: 'left' }, 
+      4: { cellWidth: 22 }, 5: { cellWidth: 12 }, 
+      6: { cellWidth: 18, fillColor: [220, 220, 220], fontSize: 14.5, fontStyle: 'bold' }, 
+      7: { cellWidth: 15 }, 
+      8: { cellWidth: 15, fillColor: [220, 220, 220], fontSize: 14.5, fontStyle: 'bold' }, 
+      9: { cellWidth: 15, fontSize: 14.5, fontStyle: 'bold' }, 
+      10: { cellWidth: 18 }, 11: { cellWidth: 18 } 
+    },
+    didDrawPage: (data) => {
+      // Ve header cho moi trang
+      drawHeader(doc);
+    }
+  });
+
+  // 3. Ve chu ky o trang cuoi cung
+  const finalY = (doc as any).lastAutoTable.finalY + 15;
+  // Kiem tra neu trang hien tai khong du cho ve chu ky thi sang trang moi
+  if (finalY > 180) {
+    doc.addPage();
+    drawHeader(doc);
+    doc.setFontSize(11); doc.setFont(fontName, 'bold');
+    doc.text('Người Lập Phiếu', 30, 85); doc.text('Thủ kho', 100, 85); doc.text('Tài xế', 170, 85); doc.text('Bảo vệ', 240, 85);
+  } else {
+    doc.setFontSize(11); doc.setFont(fontName, 'bold');
+    doc.text('Người Lập Phiếu', 30, finalY); doc.text('Thủ kho', 100, finalY); doc.text('Tài xế', 170, finalY); doc.text('Bảo vệ', 240, finalY);
+  }
+
+  const pdfBlob = doc.output('blob'); 
+  const url = URL.createObjectURL(pdfBlob);
+  const link = document.createElement('a'); 
+  link.href = url; 
+  link.setAttribute('download', fileName); 
+  document.body.appendChild(link); 
+  link.click();
+  
+  setTimeout(() => { 
+    document.body.removeChild(link); 
+    URL.revokeObjectURL(url); 
+  }, 500);
+  
+  showToast(`Đã tải file: ${fileName}`);
+
+  if (currentScreen !== 'welcome') {
+   setCurrentScreen('welcome');
+   if (currentScreen === 'soan_hang') setActiveOrderSoan(''); else if (currentScreen === 'nhap_hang') setActiveOrderNhap(''); else if (currentScreen === 'xuat_hang') setActiveOrderXuat('');
+  }
+ } catch (error) {
+  console.error('PDF Export Error:', error);
+  const errorMsg = error instanceof Error ? error.message : String(error);
+  showAlert(`Lỗi khi tạo file PDF: ${errorMsg}. Vui lòng thử lại.`);
+ } finally { setIsGeneratingPDF(false); }
+};
+
 
   // Calculate orders for Welcome screen
   const handleStartNhapHang = () => {
@@ -1676,6 +1710,16 @@ export default function App() {
                           placeholder="Nhập số lượng thực xuất..."
                         />
                       </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Trọng lượng hàng/ĐVT</label>
+                        <input 
+                          type="text" 
+                          value={trongLuong}
+                          onChange={(e) => setTrongLuong(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 outline-none"
+                          placeholder="VD: 0.5kg/cái"
+                        />
+                      </div>
                       <div className="grid grid-cols-2 gap-3">
                         <div>
                           <label className="block text-sm font-medium text-gray-700 mb-1">Số lượng bao/cây</label>
@@ -1762,7 +1806,7 @@ export default function App() {
                   <div>
                     <div className="grid grid-cols-1 gap-3 pt-3 mt-3 border-t border-amber-100">
                       <div>
-                        <label className="block text-sm font-bold text-amber-700 mb-1">Số lượng cái</label>
+                        <label className="block text-sm font-bold text-amber-700 mb-1">Số lượng nhập (cái)</label>
                         <input 
                           type="number" 
                           value={slThucXuat}
@@ -1770,7 +1814,17 @@ export default function App() {
                           className={`w-full p-3 border rounded-xl focus:ring-2 focus:ring-amber-500 outline-none ${
                             slThucXuat !== originalSlThucXuat ? 'border-red-500 bg-red-50 text-red-600 font-bold' : 'border-amber-300 bg-amber-50/30'
                           }`}
-                          placeholder="Nhập số lượng cái..."
+                          placeholder="Nhập số lượng nhập..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Trọng lượng hàng/ĐVT</label>
+                        <input 
+                          type="text" 
+                          value={trongLuong}
+                          onChange={(e) => setTrongLuong(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-amber-500 outline-none"
+                          placeholder="VD: 0.5kg/cái"
                         />
                       </div>
                       <div className="grid grid-cols-2 gap-3">
@@ -1939,17 +1993,31 @@ export default function App() {
                   />
                   
                   <div id="quantity-input">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Số lượng thực tế tại vị trí này
-                    </label>
-                    <input 
-                      type="number" 
-                      value={quantity}
-                      onChange={(e) => setQuantity(e.target.value)}
-                      disabled={false}
-                      className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50"
-                      placeholder="Nhập số lượng..."
-                    />
+                    <div className="grid grid-cols-1 gap-3">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">
+                          Số lượng thực tế tại vị trí này
+                        </label>
+                        <input 
+                          type="number" 
+                          value={quantity}
+                          onChange={(e) => setQuantity(e.target.value)}
+                          disabled={false}
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all disabled:bg-gray-50"
+                          placeholder="Nhập số lượng..."
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Trọng lượng hàng/ĐVT</label>
+                        <input 
+                          type="text" 
+                          value={trongLuong}
+                          onChange={(e) => setTrongLuong(e.target.value)}
+                          className="w-full p-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none"
+                          placeholder="VD: 0.5kg/cái"
+                        />
+                      </div>
+                    </div>
                   </div>
 
                   <button 
@@ -2154,10 +2222,10 @@ export default function App() {
                       const isPicked = (record.multiLocations && record.multiLocations.length > 0) || (record.location && record.quantity);
                       const stt = (currentPage - 1) * itemsPerPage + index + 1;
                       return (
-                        <tr key={record.id} className="bg-white border-b hover:bg-gray-50 h-[80px]">
+                        <tr key={record.id} className="bg-white border-b hover:bg-gray-50 h-[100px]">
                           <td className="px-2 py-3 text-center text-gray-500">{stt}</td>
                           <td className="px-2 py-3 font-medium text-gray-900">
-                            <div className="line-clamp-2" title={record.productName}>
+                            <div className="line-clamp-2 overflow-hidden" style={{ display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', minHeight: '2.5rem' }} title={record.productName}>
                               {record.productName}
                             </div>
                           </td>
