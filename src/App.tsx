@@ -48,7 +48,7 @@ interface Record {
   deliveryAddress?: string; // For xuat_hang
 }
 
-type ScanField = 'orderNumber' | 'pickerName' | 'location' | 'productName' | 'productQR' | 'welcomeOrderQR' | 'transferToLocation' | 'vehicleNumber' | 'pxkNumber' | null;
+type ScanField = 'orderNumber' | 'pickerName' | 'location' | 'productName' | 'productQR' | 'welcomeOrderQR' | 'transferToLocation' | 'vehicleNumber' | 'pxkNumber' | 'maBravo' | null;
 
 type ModalState = {
   isOpen: boolean;
@@ -1207,6 +1207,13 @@ export default function App() {
     // 1. Nhập: N_ddMMMyy_hhmmss_tên người nhập
     // 2. Soạn: S_số đơn hàng_ddMMMyy_hhmmss_tên người soạn
     // 3. Xuất: X_số đơn hàng_ddMMMyy_hhmmss_tên người xuất
+    if (currentOrderRecords.length === 0) {
+      showAlert('Không có dữ liệu để xuất!');
+      return;
+    }
+
+    showToast('Đang chuẩn bị file CSV...');
+    
     const isNhap = currentOrderRecords.some(r => r.type === 'nhap_hang');
     const isXuat = currentOrderRecords.some(r => r.type === 'xuat_hang');
     const now = new Date();
@@ -2112,7 +2119,7 @@ export default function App() {
                 </div>
               )}
               
-              <div className="overflow-x-auto overflow-y-auto" style={{ height: '420px' }}>
+              <div className="overflow-x-auto overflow-y-auto" style={{ height: '600px' }}>
                 <table className="w-full text-sm text-left relative">
                   <thead className="text-xs text-gray-700 uppercase bg-gray-50 sticky top-0 z-10 shadow-sm">
                     <tr>
@@ -2127,7 +2134,7 @@ export default function App() {
                       const isPicked = (record.multiLocations && record.multiLocations.length > 0) || (record.location && record.quantity);
                       const stt = (currentPage - 1) * itemsPerPage + index + 1;
                       return (
-                        <tr key={record.id} className="bg-white border-b hover:bg-gray-50 h-[52px]">
+                        <tr key={record.id} className="bg-white border-b hover:bg-gray-50 h-[80px]">
                           <td className="px-2 py-3 text-center text-gray-500">{stt}</td>
                           <td className="px-2 py-3 font-medium text-gray-900">
                             <div className="line-clamp-2" title={record.productName}>
