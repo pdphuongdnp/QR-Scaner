@@ -63,6 +63,13 @@ export const downloadUserGuideDocx = async () => {
             ],
             bullet: { level: 0 },
           }),
+          new Paragraph({
+            children: [
+              new TextRun({ text: "Quét mã QR linh hoạt: ", bold: true }),
+              new TextRun('Bạn có thể quét trực tiếp bằng camera hoặc tải ảnh mã QR từ máy lên bằng nút "Tải ảnh mã QR từ máy" trong trình quét nếu ánh sáng yếu.'),
+            ],
+            bullet: { level: 0 },
+          }),
 
           new Paragraph({
             text: "2. Màn hình chính (Chào mừng)",

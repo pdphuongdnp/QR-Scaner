@@ -303,7 +303,7 @@ export default function App() {
       return [
         {
           target: '#btn-scan-product',
-          content: 'Đây là nút quan trọng nhất! Bấm vào để quét mã QR trên sản phẩm. Thông tin sản phẩm sẽ tự động hiện ra.',
+          content: 'Đây là nút quan trọng nhất! Bấm vào để quét mã QR trên sản phẩm. Bạn có thể quét trực tiếp từ camera hoặc tải ảnh mã QR từ máy lên nếu ánh sáng yếu.',
           disableBeacon: true,
         },
         {
